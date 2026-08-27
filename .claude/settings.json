@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/asadd/AppData/Local/Programs/Python/Python314/Lib/site-packages/nfl_data_py-0.3.3.dist-info/**)"
+    ]
+  }
+}
