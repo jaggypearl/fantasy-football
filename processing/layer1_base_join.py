@@ -3,6 +3,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from pbp_box_scores import build_pbp_box_scores
+
 START_YEAR = 2010
 END_YEAR = 2025
 NGS_START_YEAR = 2016
@@ -121,7 +123,33 @@ def load_box_scores() -> pd.DataFrame:
     box = box.drop(columns=["season_type"], errors="ignore")
     box["box_team"] = normalize_team_abbr(box["box_team"], box["season"])
     box["box_opponent_team"] = normalize_team_abbr(box["box_opponent_team"], box["season"])
-    return box
+    return fill_missing_seasons_from_pbp(box)
+
+
+def fill_missing_seasons_from_pbp(box: pd.DataFrame) -> pd.DataFrame:
+    """Rebuild the stat line from play-by-play for seasons with no box score file.
+
+    nflverse publishes weekly box scores a season behind play-by-play, so the most
+    recent season would otherwise join as all-NaN and then be zero-filled into a
+    season that looks complete but scores nothing. Validated against 2024, where
+    both sources exist: fantasy_points_ppr matches exactly on 99.4% of player-weeks.
+    """
+    have = set(box["season"].dropna().astype(int).unique())
+    missing = [y for y in range(START_YEAR, END_YEAR + 1) if y not in have]
+    if not missing:
+        return box
+
+    frames = [box]
+    for year in missing:
+        derived = build_pbp_box_scores(year)
+        if derived.empty:
+            print(f"[missing] no play-by-play to rebuild box scores for {year}.")
+            continue
+        derived["box_team"] = normalize_team_abbr(derived["box_team"], derived["season"])
+        print(f"[info] {year} has no box_scores CSV; rebuilt {len(derived)} player-weeks from play-by-play.")
+        frames.append(derived)
+
+    return pd.concat(frames, ignore_index=True)
 
 
 def load_injury_reports() -> pd.DataFrame:

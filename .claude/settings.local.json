@@ -1,7 +1,17 @@
 {
   "permissions": {
     "allow": [
-      "PowerShell(python -c \"import nfl_data_py, os; print\\(os.path.dirname\\(nfl_data_py.__file__\\)\\)\")"
+      "PowerShell(python -c \"import nfl_data_py, os; print\\(os.path.dirname\\(nfl_data_py.__file__\\)\\)\")",
+      "Bash(.venv/Scripts/python.exe -c \"import xgboost, sklearn, pandas; print\\('xgb', xgboost.__version__\\); print\\('sk', sklearn.__version__\\); print\\('pd', pandas.__version__\\)\")",
+      "Bash(.venv/Scripts/python.exe -c \"import sys; print\\(sys.version\\)\")",
+      "Bash(.venv/Scripts/pip.exe list *)",
+      "Bash(\"/c/Users/asadd/AppData/Local/Programs/Python/Python314/python.exe\" -c \"import sys; print\\(sys.version\\)\")",
+      "Bash(\"/c/Users/asadd/AppData/Local/Programs/Python/Python314/python.exe\" -c \"import xgboost; print\\('xgb', xgboost.__version__\\)\")",
+      "Bash(\"/c/Users/asadd/AppData/Local/Programs/Python/Python314/python.exe\" -c \"import sklearn, pandas, pyarrow; print\\('sk', sklearn.__version__, 'pd', pandas.__version__\\)\")",
+      "Bash(/c/Users/asadd/AppData/Local/Programs/Python/Python314/python.exe -c 'import pandas; print\\('\\\\''pd'\\\\'', pandas.__version__\\)')",
+      "Bash(/c/Users/asadd/AppData/Local/Programs/Python/Python314/python.exe -c 'import numpy; print\\('\\\\''np'\\\\'', numpy.__version__\\)')",
+      "Bash(/c/Users/asadd/AppData/Local/Programs/Python/Python314/python.exe -c 'import pyarrow; print\\('\\\\''pa'\\\\'', pyarrow.__version__\\)')",
+      "Bash(/c/Users/asadd/AppData/Local/Programs/Python/Python314/python.exe -m pip install xgboost scikit-learn)"
     ]
   }
 }
