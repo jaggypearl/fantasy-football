@@ -3,7 +3,7 @@ from pathlib import Path
 import nfl_data_py as nfl
 
 START_YEAR = 2010
-END_YEAR = 2025
+END_YEAR = 2026
 OUTPUT_DIR = Path(__file__).resolve().parent.parent / 'data' / 'raw' / 'schedules'
 
 

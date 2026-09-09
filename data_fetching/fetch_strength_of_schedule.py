@@ -4,7 +4,7 @@ import nfl_data_py as nfl
 import pandas as pd
 
 START_YEAR = 2010
-END_YEAR = 2025
+END_YEAR = 2026
 OUTPUT_DIR = Path(__file__).resolve().parent.parent / "data" / "raw" / "strength_of_schedule"
 
 
@@ -54,6 +54,7 @@ def main() -> None:
         left_on=["season", "opponent"],
         right_on=["season", "team"],
         suffixes=("", "_opp"),
+        how="left",
     ).drop(columns=["team_opp"])
 
     prior_win_pct = win_pct.copy()
