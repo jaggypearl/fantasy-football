@@ -26,3 +26,18 @@ ADD LATER-
     - goal is to have the model track the offensive coordinator success or     lack of success (via patterns/correlations) to find the bad and good offesive coordinatorss
     - alsop have it detect patterns in offensive coordinator playcalling (ie target shares to wr1/rb/te, qb performance correlations with OC, etc.)
 -strength of schedule data
+
+
+
+ISSUES:
+- Kaelon Black is a backup running back to christian mccaffery and is projected 17 points which is insane.
+       - backup running backs need to be prokected a lot lower. this projection only makes sense if mccaffery is out/injured. (Maybe pay more attention to individual history)??
+            - maybe add depth chart information to deduce the rb heirarchies
+                - Normal backs tho:
+                    - Tank Bigsby
+                    - Justice Hill (What are consistent about these?)
+                    
+- DNP Issue (in claude)
+- Tight End formula is fucked
+- Qbs a little too conservative in projection
+- 
