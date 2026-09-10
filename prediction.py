@@ -16,6 +16,7 @@ SCHEDULE_PATH = RAW_DIR / "schedules" / "schedules_2026.csv"
 BIO_PATH = RAW_DIR / "bio_data" / "bio_data_2026.csv"
 OC_PATH = RAW_DIR / "offensive_coordinators" / "offensive_coordinators_2026.csv"
 SOS_PATH = RAW_DIR / "strength_of_schedule" / "strength_of_schedule_2026.csv"
+DEPTH_CHART_PATH = RAW_DIR / "depth_chart" / "depth_chart_2026.csv"
 TEAM_AGGS_PATH = PROCESSED_DIR / "team_aggs.parquet"
 TRAINING_PATH = PROCESSED_DIR / "final_training_data.parquet"
 
@@ -27,6 +28,7 @@ DEFAULT_WEATHER_TEMP = 70.0
 DEFAULT_WEATHER_WIND = 5.0
 DEFAULT_SPREAD_LINE = 0.0
 DEFAULT_TOTAL_LINE = 45.0
+DEPTH_SCORE_UNKNOWN = 0.7
 
 TEAM_ALIASES = {"LAR": "LA", "STL": "LA", "OAK": "LV", "SD": "LAC", "WSH": "WAS",
                 "ARZ": "ARI", "BLT": "BAL", "CLV": "CLE", "HST": "HOU", "SL": "LA"}
@@ -133,10 +135,52 @@ def player_context_row(training: pd.DataFrame, player_id: str, name: str, positi
     return peers[feature_cols].median(numeric_only=True), f"{CONTEXT_SEASON} {position} median"
 
 
+def depth_chart_score(player_id, name: str, position: str) -> tuple[float, str]:
+    if not DEPTH_CHART_PATH.exists():
+        return DEPTH_SCORE_UNKNOWN, f"no {DEPTH_CHART_PATH.name}"
+
+    chart = pd.read_csv(DEPTH_CHART_PATH, low_memory=False)
+    week = chart[chart["week"] == TARGET_WEEK]
+    if week.empty:
+        week = chart[chart["week"] == chart["week"].min()]
+
+    rows = week[week["player_id"] == player_id] if player_id is not None else week.iloc[0:0]
+    if rows.empty:
+        rows = week[week["player_name"].str.casefold() == name.casefold()]
+    if rows.empty:
+        return DEPTH_SCORE_UNKNOWN, "not on depth chart"
+
+    exact = rows[rows["position"].astype("string").str.upper() == position]
+    chosen = exact if not exact.empty else rows
+    chosen = chosen.sort_values("depth_chart_rank")
+    rank = chosen.iloc[0]["depth_chart_rank"]
+    score = float(chosen.iloc[0]["depth_chart_position"])
+    return score, f"{position}{int(rank)} on depth chart"
+
+
+def prior_season_target_share(training: pd.DataFrame, player_id, name: str) -> float | None:
+    if "targets" not in training.columns or "team" not in training.columns:
+        return None
+
+    rows = training[training["player_id"] == player_id]
+    if rows.empty:
+        rows = training[training["player_name"].str.casefold() == name.casefold()]
+    if rows.empty:
+        return None
+
+    player_targets = float(rows["targets"].fillna(0.0).sum())
+    player_team = rows.sort_values("week")["team"].iloc[-1]
+    team_targets = float(training[training["team"] == player_team]["targets"].fillna(0.0).sum())
+    if team_targets <= 0:
+        return None
+    return player_targets / team_targets
+
+
 def build_overrides(game: pd.Series, is_home: bool, bio: pd.Series, team: str, opponent: str,
                     position: str, oc: pd.Series | None, sos: pd.Series | None,
                     team_def: pd.Series | None, opp_def: pd.Series | None,
-                    league_avg: float | None) -> dict[str, float]:
+                    league_avg: float | None, depth_score: float,
+                    target_share: float | None) -> dict[str, float]:
     spread = game.get("spread_line")
     total = game.get("total_line")
     spread = DEFAULT_SPREAD_LINE if pd.isna(spread) else float(spread)
@@ -162,7 +206,11 @@ def build_overrides(game: pd.Series, is_home: bool, bio: pd.Series, team: str, o
         "sched_temp": DEFAULT_WEATHER_TEMP,
         "sched_wind": DEFAULT_WEATHER_WIND,
         "rest_days": float(rest) if pd.notna(rest) else 7.0,
+        "depth_chart_position": float(depth_score),
     }
+
+    if target_share is not None:
+        values["player_target_share_of_team"] = float(target_share)
 
     for column in ("away_rest", "home_rest", "away_moneyline", "home_moneyline",
                    "away_spread_odds", "home_spread_odds", "under_odds", "over_odds", "div_game"):
@@ -277,7 +325,7 @@ def predict(name: str) -> None:
     training = pd.read_parquet(
         TRAINING_PATH,
         columns=sorted(set(feature_cols) | {"season", "week", "player_id", "player_name",
-                                            "bio_position", "dnp_flag"}),
+                                            "bio_position", "dnp_flag", "targets", "team"}),
         filters=[("season", "==", float(CONTEXT_SEASON))],
     )
     context, context_source = player_context_row(training, player.get("player_id"), player_name,
@@ -296,8 +344,11 @@ def predict(name: str) -> None:
         if position in DEF_STRENGTH_COLS and not aggs.empty:
             league_avg = aggs[DEF_STRENGTH_COLS[position]].mean()
 
+    depth_score, depth_source = depth_chart_score(player.get("player_id"), player_name, position)
+    target_share = prior_season_target_share(training, player.get("player_id"), player_name)
+
     overrides = build_overrides(game, is_home, player, team, opponent, position,
-                                oc, sos, team_def, opp_def, league_avg)
+                                oc, sos, team_def, opp_def, league_avg, depth_score, target_share)
     raw_vector, defaulted = assemble_vector(feature_cols, context, overrides, scaler_mean)
     normalized = (raw_vector - np.asarray(scaler_mean)) / np.asarray(scaler_scale)
     normalized = normalized.reshape(1, -1)
@@ -315,6 +366,8 @@ def predict(name: str) -> None:
     detail = format_detail(position, predictions)
     if detail:
         print(f"({detail})")
+    share_text = "n/a" if target_share is None else f"{target_share:.1%}"
+    print(f"[depth: {depth_source} ({depth_score:.2f}); {CONTEXT_SEASON} target share: {share_text}]")
     print(f"[context: {context_source}; {len(defaulted)} of {len(feature_cols)} features unavailable]")
 
 

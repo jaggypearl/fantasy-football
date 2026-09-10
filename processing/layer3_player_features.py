@@ -3,10 +3,14 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-PROCESSED_DIR = Path(__file__).resolve().parent.parent / "data" / "processed"
+PROJECT_DIR = Path(__file__).resolve().parent.parent
+PROCESSED_DIR = PROJECT_DIR / "data" / "processed"
+DEPTH_CHART_DIR = PROJECT_DIR / "data" / "raw" / "depth_chart"
 BASE_PATH = PROCESSED_DIR / "base_processed.parquet"
 TEAM_AGGS_PATH = PROCESSED_DIR / "team_aggs.parquet"
 OUTPUT_PATH = PROCESSED_DIR / "final_training_data.parquet"
+
+DEPTH_SCORE_UNKNOWN = 0.7
 
 DEF_STRENGTH_POSITION_MAP = {
     "def_strength_vs_rb": "RB",
@@ -77,6 +81,92 @@ def build_usage_trend_features(result: pd.DataFrame) -> pd.DataFrame:
     result["target_share_trend"] = safe_ratio(result["avg_target_share"], result["prior_avg_target_share"])
 
     result = result.drop(columns=["usage", "cumulative_usage", "avg_target_share", "prior_usage", "prior_avg_target_share"])
+    return result
+
+
+def load_depth_charts() -> pd.DataFrame:
+    paths = sorted(DEPTH_CHART_DIR.glob("depth_chart_*.csv"))
+    if not paths:
+        print("[flag] no depth_chart_*.csv found; depth_chart_position will default to "
+              f"{DEPTH_SCORE_UNKNOWN} for every row. Run data_fetching/fetch_depth_charts.py.")
+        return pd.DataFrame(columns=["season", "week", "player_id", "position", "depth_chart_position"])
+
+    frames = [pd.read_csv(path, low_memory=False) for path in paths]
+    charts = pd.concat(frames, ignore_index=True)
+    charts["season"] = pd.to_numeric(charts["season"], errors="coerce")
+    charts["week"] = pd.to_numeric(charts["week"], errors="coerce")
+    charts = charts[charts["player_id"].notna() & charts["season"].notna() & charts["week"].notna()]
+    return charts
+
+
+def build_depth_chart_features(result: pd.DataFrame) -> pd.DataFrame:
+    charts = load_depth_charts()
+    if charts.empty:
+        result["depth_chart_position"] = DEPTH_SCORE_UNKNOWN
+        return result
+
+    result["_join_position"] = result["bio_position"].fillna(result["position"]).astype("string").str.upper()
+
+    by_position = (
+        charts.sort_values("depth_chart_rank")
+        .drop_duplicates(subset=["season", "week", "player_id", "position"], keep="first")
+        .rename(columns={"position": "_join_position", "depth_chart_position": "_depth_exact"})
+        [["season", "week", "player_id", "_join_position", "_depth_exact"]]
+    )
+    result = result.merge(by_position, on=["season", "week", "player_id", "_join_position"], how="left")
+
+    by_player = (
+        charts.sort_values("depth_chart_rank")
+        .drop_duplicates(subset=["season", "week", "player_id"], keep="first")
+        .rename(columns={"depth_chart_position": "_depth_any"})
+        [["season", "week", "player_id", "_depth_any"]]
+    )
+    result = result.merge(by_player, on=["season", "week", "player_id"], how="left")
+
+    result["depth_chart_position"] = (
+        result["_depth_exact"].fillna(result["_depth_any"]).fillna(DEPTH_SCORE_UNKNOWN)
+    )
+    result = result.drop(columns=["_join_position", "_depth_exact", "_depth_any"])
+    return result
+
+
+def build_player_target_share(result: pd.DataFrame) -> pd.DataFrame:
+    result = result.sort_values(["player_id", "season", "week"]).reset_index(drop=True)
+    result["_targets"] = result["targets"].fillna(0.0)
+
+    team_week = (
+        result.groupby(["season", "team", "week"], dropna=False)["_targets"].sum()
+        .reset_index().rename(columns={"_targets": "_team_targets"})
+        .sort_values(["season", "team", "week"])
+    )
+    team_week["_team_prior"] = (
+        team_week.groupby(["season", "team"])["_team_targets"].cumsum() - team_week["_team_targets"]
+    )
+    result = result.merge(team_week[["season", "team", "week", "_team_prior"]],
+                          on=["season", "team", "week"], how="left")
+
+    result = result.sort_values(["player_id", "season", "week"]).reset_index(drop=True)
+    grouped = result.groupby(["player_id", "season"])["_targets"]
+    result["_player_prior"] = grouped.cumsum() - result["_targets"]
+    in_season = safe_ratio(result["_player_prior"], result["_team_prior"])
+
+    player_season = result.groupby(["player_id", "season"], as_index=False)["_targets"].sum()
+    team_season = (
+        team_week.groupby(["season", "team"], as_index=False)["_team_targets"].sum()
+        .rename(columns={"_team_targets": "_team_season_targets"})
+    )
+    player_team = result[["player_id", "season", "team"]].drop_duplicates(subset=["player_id", "season"], keep="last")
+    player_season = player_season.merge(player_team, on=["player_id", "season"], how="left")
+    player_season = player_season.merge(team_season, on=["season", "team"], how="left")
+    player_season["_prior_season_share"] = safe_ratio(
+        player_season["_targets"], player_season["_team_season_targets"])
+    player_season["season"] = player_season["season"] + 1
+
+    result = result.merge(player_season[["player_id", "season", "_prior_season_share"]],
+                          on=["player_id", "season"], how="left")
+
+    result["player_target_share_of_team"] = in_season.fillna(result["_prior_season_share"])
+    result = result.drop(columns=["_targets", "_team_prior", "_player_prior", "_prior_season_share"])
     return result
 
 
@@ -158,6 +248,8 @@ def main() -> None:
 
     result = build_matchup_features(result, team_aggs)
     result = build_usage_trend_features(result)
+    result = build_depth_chart_features(result)
+    result = build_player_target_share(result)
     result = build_seasonal_context_features(result)
     result = build_injury_recovery_features(result)
     result = build_rest_days(result)
@@ -179,6 +271,7 @@ def main() -> None:
         "opp_def_strength_for_position", "matchup_advantage_score", "usage_trend",
         "target_share_trend", "weeks_into_season", "games_played_this_szn",
         "bye_week_passed", "weeks_since_injury", "prev_injuries_this_szn", "rest_days",
+        "depth_chart_position", "player_target_share_of_team",
     ]
 
     expected_ranges = {
@@ -191,6 +284,8 @@ def main() -> None:
         "weeks_since_injury": (0, 99),
         "prev_injuries_this_szn": (0, 17),
         "rest_days": (3, 20),
+        "depth_chart_position": (0.1, 1.0),
+        "player_target_share_of_team": (0, 1),
     }
 
     for col in new_cols:
