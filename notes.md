@@ -40,4 +40,8 @@ ISSUES:
 - DNP Issue (in claude)
 - Tight End formula is fucked
 - Qbs a little too conservative in projection
+- Jags wr core kinda weird 
+    - why is meyers projecterd more than parker washingotn and brian thomas when he is literally wr3
+        - *Heirarichies seem messed up*
+- Is the answer to import a depth chart? (I would want to prioritize this first before the other issues)
 - 
