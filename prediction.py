@@ -24,6 +24,13 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from processing.layer3_player_features import (
+    MIN_CARRIES_FOR_YPC,
+    RECENT_GAMES,
+    RUSH_VOLUME_SHRINKAGE_GAMES,
+    RUSH_YARDS_SHRINKAGE_GAMES,
+)
+
 PROJECT_DIR = Path(__file__).resolve().parent
 MODEL_DIR = PROJECT_DIR / "model"
 RAW_DIR = PROJECT_DIR / "data" / "raw"
@@ -249,6 +256,15 @@ class SeasonForm:
             prior = prior.iloc[0:0]
         self.prior_box = prior
 
+        # Last season in full, for the rushing baselines Layer 3 shrinks toward.
+        prior_full = read_optional_csv(PRIOR_BOX_SCORE_PATH)
+        if not prior_full.empty:
+            prior_full = prior_full[prior_full["season_type"] == "REG"].copy()
+            prior_full["week"] = pd.to_numeric(prior_full["week"], errors="coerce")
+            prior_full = prior_full[prior_full["week"].notna()]
+            prior_full["team"] = prior_full["recent_team"].map(normalize_team)
+        self.prior_full_box = prior_full
+
         injuries = read_optional_csv(INJURY_PATH)
         if not injuries.empty:
             injuries = injuries[injuries["game_type"] == "REG"].copy()
@@ -372,6 +388,61 @@ class SeasonForm:
         share_trend = (safe_ratio(share_now, share_before)
                        if share_now is not None and share_before is not None else None)
         return usage_trend, share_trend
+
+    def rushing_features(self, player_id, name: str, team: str) -> tuple[dict[str, float], str | None]:
+        """Layer 3's rushing features as of the target week.
+
+        This season's carries and yards through last week, shrunk toward the
+        player's full previous season with the same constants Layer 3 uses, and
+        the average of the last few games played across both seasons.
+        """
+        now = self._player_rows(self.box, player_id, name) if self.has_data() else pd.DataFrame()
+        before = self._player_rows(self.prior_full_box, player_id, name)
+        if now.empty and before.empty:
+            return {}, None
+
+        def total(rows: pd.DataFrame, column: str) -> float:
+            return float(rows[column].fillna(0.0).sum()) if not rows.empty else 0.0
+
+        games = len(now)
+        carries, yards = total(now, "carries"), total(now, "rushing_yards")
+        team_carries = total(self.box[self.box["team"] == team], "carries") if games else 0.0
+
+        last_games = len(before)
+        last_carries, last_yards = total(before, "carries"), total(before, "rushing_yards")
+        last_team_carries = None
+        if last_games:
+            last_team = before.sort_values("week")["team"].iloc[-1]
+            last_team_carries = total(self.prior_full_box[self.prior_full_box["team"] == last_team], "carries")
+
+        def shrink(current: float | None, prior: float | None, k: float) -> float | None:
+            return blend(current if games else None, prior, games / (games + k) if games else 0.0)
+
+        carries_pg = shrink(safe_ratio(carries, games), safe_ratio(last_carries, last_games),
+                            RUSH_VOLUME_SHRINKAGE_GAMES)
+        yards_pg = shrink(safe_ratio(yards, games), safe_ratio(last_yards, last_games),
+                          RUSH_YARDS_SHRINKAGE_GAMES)
+        share = shrink(safe_ratio(carries, team_carries),
+                       safe_ratio(last_carries, last_team_carries) if last_team_carries else None,
+                       RUSH_VOLUME_SHRINKAGE_GAMES)
+
+        values: dict[str, float] = {}
+        for column, value in (("carries_per_game", carries_pg), ("rush_yds_per_game", yards_pg),
+                              ("carry_share_of_team", share)):
+            if value is not None:
+                values[column] = value
+        if carries_pg and yards_pg is not None and carries + last_carries >= MIN_CARRIES_FOR_YPC:
+            values["yards_per_carry"] = yards_pg / carries_pg
+
+        recent = pd.concat([before.assign(_order=0), now.assign(_order=1)], ignore_index=True)
+        recent = recent.sort_values(["_order", "week"]).tail(RECENT_GAMES)
+        if not recent.empty:
+            values["carries_last3"] = float(recent["carries"].fillna(0.0).mean())
+
+        detail = ", ".join(f"{column} {values[column]:.{3 if 'share' in column else 1}f}"
+                           for column in ("carries_per_game", "rush_yds_per_game", "yards_per_carry",
+                                          "carry_share_of_team", "carries_last3") if column in values)
+        return values, f"{detail} ({games} {TARGET_SEASON} game(s) + {last_games} {CONTEXT_SEASON})"
 
     def depth_score(self, player_id, name: str, position: str) -> tuple[float, str]:
         if self.depth_chart.empty:
@@ -580,6 +651,11 @@ def build_overrides(game: pd.Series, is_home: bool, bio: pd.Series, team: str, p
     if trend_notes:
         notes["trends"] = ", ".join(trend_notes) + f" ({TARGET_SEASON} weight {weight:.0%})"
 
+    rushing, rushing_detail = form.rushing_features(player_id, player_name, team)
+    values.update(rushing)
+    if rushing_detail:
+        notes["rushing"] = rushing_detail
+
     oline = form.oline_rank(team)
     if oline is not None:
         values["oline_rank"], notes["oline"] = oline
@@ -605,11 +681,15 @@ def build_overrides(game: pd.Series, is_home: bool, bio: pd.Series, team: str, p
         values["bio_draft_number"] = float(draft_number)
 
     if oc is not None:
+        # Once Layer 1 includes a season whose coordinator file carries these
+        # columns, the merge with team_aggs suffixes them _x (coordinator) and _y
+        # (team_aggs); the models train on _y, the only one populated historically.
         for column in ("team_target_share_to_wr", "team_target_share_to_te",
                        "team_target_share_to_rb", "team_rush_share_to_rb"):
             value = oc.get(column)
             if pd.notna(value):
-                values[column] = float(value)
+                for destination in (column, f"{column}_x", f"{column}_y"):
+                    values[destination] = float(value)
 
     if sos is not None:
         for source, destinations in (("preseason_sos", ("preseason_sos_x", "preseason_sos_y")),
@@ -779,11 +859,19 @@ def predict(name: str, requested_week: int | None = None, today: date | None = N
 
     models = load_models(position_meta)
     predictions = {}
+    lifted = []
     for stat, model in models.items():
         value = float(model.predict(normalize(raw_vector))[0])
         if rushing_vector is not None and stat in RB_RUSHING_STATS:
-            value = max(value, float(model.predict(normalize(rushing_vector))[0]))
+            floored_value = float(model.predict(normalize(rushing_vector))[0])
+            if floored_value > value:
+                lifted.append(f"{stat} +{floored_value - value:.1f}")
+                value = floored_value
         predictions[stat] = max(0.0, value)
+    if rushing_vector is not None and lifted:
+        notes["rb_floor"] += f"; floor lifted {', '.join(lifted)}"
+    elif rushing_vector is not None:
+        notes["rb_floor"] += "; floor did not change the projection"
 
     weights = metadata["ppr_weights"]
     points = max(0.0, sum(predictions.get(stat, 0.0) * weight for stat, weight in weights.items()))
@@ -802,7 +890,8 @@ def predict(name: str, requested_week: int | None = None, today: date | None = N
     print(f"[form: {form.summary()}; {games} game(s) played, {TARGET_SEASON} weight {weight:.0%}; "
           f"depth: {depth_source} ({depth_score:.2f})]")
     print(f"[target share: {share_text} ({share_basis})]")
-    for key, label in (("trends", "trends"), ("oline", "o-line rank"), ("rb_floor", "RB rushing")):
+    for key, label in (("trends", "trends"), ("rushing", "rushing form"), ("oline", "o-line rank"),
+                       ("rb_floor", "RB floor")):
         if key in notes:
             print(f"[{label}: {notes[key]}]")
     print(f"[context: {context_source}; {len(defaulted)} of {len(feature_cols)} features unavailable]")
@@ -816,7 +905,14 @@ def main() -> None:
     parser.add_argument("name", nargs="+", help="player name, e.g. \"Ja'Marr Chase\"")
     parser.add_argument("-w", "--week", type=int, metavar="N",
                         help=f"{TARGET_SEASON} regular-season week to project (default: next unplayed)")
+    parser.add_argument("--model-dir", type=Path, metavar="DIR",
+                        help="load models from DIR instead of model/, e.g. a candidate from train.py --model-dir")
     args = parser.parse_args()
+
+    if args.model_dir is not None:
+        global MODEL_DIR, METADATA_PATH
+        MODEL_DIR = args.model_dir.resolve()
+        METADATA_PATH = MODEL_DIR / "model_metadata.json"
 
     try:
         predict(" ".join(args.name).strip(), args.week)

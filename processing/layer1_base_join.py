@@ -6,7 +6,7 @@ import pandas as pd
 from pbp_box_scores import build_pbp_box_scores
 
 START_YEAR = 2010
-END_YEAR = 2025
+END_YEAR = 2026
 NGS_START_YEAR = 2016
 
 RAW_DIR = Path(__file__).resolve().parent.parent / "data" / "raw"

@@ -62,25 +62,151 @@ def build_matchup_features(result: pd.DataFrame, team_aggs: pd.DataFrame) -> pd.
 
 
 def build_usage_trend_features(result: pd.DataFrame) -> pd.DataFrame:
+    """This season's usage and average target share over the weeks before this one,
+    divided by the same span of last season.
+
+    Both sides stop at week - 1, so the game being predicted never feeds its own
+    trend. Last season's side is looked up as-of week - 1 rather than joined on
+    the exact week, so a bye or missed week last season no longer blanks the row.
+    Week 1 has no prior weeks and is NaN.
+    """
     result = result.sort_values(["player_id", "season", "week"]).reset_index(drop=True)
 
-    result["usage"] = result["targets"] + result["carries"]
-    result["cumulative_usage"] = result.groupby(["player_id", "season"])["usage"].cumsum()
+    result["_usage"] = result["targets"].fillna(0.0) + result["carries"].fillna(0.0)
+    result["_played"] = (result["dnp_flag"] == 0).astype(float)
+    result["_share"] = result["target_share"].fillna(0.0) * result["_played"]
 
-    cum_target_share_sum = result.groupby(["player_id", "season"])["target_share"].cumsum()
-    cum_count = result.groupby(["player_id", "season"]).cumcount() + 1
-    result["avg_target_share"] = cum_target_share_sum / cum_count
+    grouped = result.groupby(["player_id", "season"])
+    cum = pd.DataFrame({
+        "_cum_usage": grouped["_usage"].cumsum(),
+        "_cum_share": grouped["_share"].cumsum(),
+        "_cum_played": grouped["_played"].cumsum(),
+    })
+    before = cum.sub(result[["_usage", "_share", "_played"]].to_numpy())
 
-    prior = result[["player_id", "season", "week", "cumulative_usage", "avg_target_share"]].copy()
-    prior["season"] = prior["season"] + 1
-    prior = prior.rename(columns={"cumulative_usage": "prior_usage", "avg_target_share": "prior_avg_target_share"})
+    # A last-season row at week v covers weeks <= v, i.e. weeks < v + 1, so keying
+    # it at v + 1 and matching backward finds the span strictly before this week.
+    last = pd.concat([result[["player_id", "season", "week"]], cum], axis=1).dropna(subset=["player_id", "week"])
+    last["season"] = last["season"] + 1
+    last["week"] = last["week"] + 1
+    last = last.rename(columns={c: f"_last{c}" for c in cum.columns}).sort_values("week")
 
-    result = result.merge(prior, on=["player_id", "season", "week"], how="left")
+    keys = result[["player_id", "season", "week"]].copy()
+    keys["_row"] = np.arange(len(result))
+    keys = keys.dropna(subset=["player_id", "week"]).sort_values("week")
+    matched = pd.merge_asof(keys, last, on="week", by=["player_id", "season"], direction="backward")
+    matched = matched.set_index("_row").reindex(np.arange(len(result)))
 
-    result["usage_trend"] = safe_ratio(result["cumulative_usage"], result["prior_usage"])
-    result["target_share_trend"] = safe_ratio(result["avg_target_share"], result["prior_avg_target_share"])
+    usage_now = before["_cum_usage"]
+    share_now = safe_ratio(before["_cum_share"], before["_cum_played"])
+    usage_then = matched["_last_cum_usage"]
+    share_then = safe_ratio(matched["_last_cum_share"], matched["_last_cum_played"])
 
-    result = result.drop(columns=["usage", "cumulative_usage", "avg_target_share", "prior_usage", "prior_avg_target_share"])
+    result["usage_trend"] = safe_ratio(usage_now, usage_then).where(before["_cum_played"] > 0)
+    result["target_share_trend"] = safe_ratio(share_now, share_then)
+
+    result = result.drop(columns=["_usage", "_played", "_share"])
+    return result
+
+
+# Games of this season's rushing it takes to count as much as all of last season:
+# weight n / (n + k) with n = games played before this week. Fit on 2016-2025 RBs
+# as the k that best predicted rest-of-season rate from the first 1-6 games,
+# beating both the raw in-season rate and last season's rate. (QBs fit ~6.)
+RUSH_VOLUME_SHRINKAGE_GAMES = 2.0   # carries per game, carry share of team
+RUSH_YARDS_SHRINKAGE_GAMES = 3.0    # rush yards per game
+
+# Yards per carry is left NaN until the carries behind it reach this many.
+MIN_CARRIES_FOR_YPC = 10.0
+
+RECENT_GAMES = 3
+
+
+def shrink_toward_prior(current: pd.Series, prior: pd.Series, games: pd.Series, k: float) -> pd.Series:
+    weight = games / (games + k)
+    blended = weight * current + (1.0 - weight) * prior
+    return blended.fillna(current.where(games > 0)).fillna(prior)
+
+
+def build_rushing_features(result: pd.DataFrame) -> pd.DataFrame:
+    """Rushing volume and efficiency from games before this one.
+
+    Every in-season number is cumulative through last week, shrunk toward the
+    player's own previous season, so week 1 is last season outright and a hot
+    two-game start moves it only halfway. A rookie with no previous season gets
+    the raw in-season rate after their first game, NaN before that.
+    """
+    result = result.sort_values(["player_id", "season", "week"]).reset_index(drop=True)
+
+    played = (result["dnp_flag"] == 0).astype(float)
+    carries = result["carries"].fillna(0.0) * played
+    yards = result["rushing_yards"].fillna(0.0) * played
+    frame = pd.DataFrame({"player_id": result["player_id"], "season": result["season"],
+                          "team": result["team"], "week": result["week"],
+                          "_played": played, "_carries": carries, "_yards": yards})
+
+    team_week = (
+        frame.groupby(["season", "team", "week"], dropna=False)["_carries"].sum()
+        .reset_index().rename(columns={"_carries": "_team_carries"})
+        .sort_values(["season", "team", "week"])
+    )
+    team_week["_team_before"] = (
+        team_week.groupby(["season", "team"])["_team_carries"].cumsum() - team_week["_team_carries"]
+    )
+    frame = frame.merge(team_week, on=["season", "team", "week"], how="left")
+
+    grouped = frame.groupby(["player_id", "season"])
+    games_before = grouped["_played"].cumsum() - frame["_played"]
+    carries_before = grouped["_carries"].cumsum() - frame["_carries"]
+    yards_before = grouped["_yards"].cumsum() - frame["_yards"]
+
+    # Same denominators as build_player_target_share: this season, every team
+    # carry before this week; last season, the full-season total of the team
+    # the player finished with.
+    team_before = frame["_team_before"]
+    last = frame.groupby(["player_id", "season"], as_index=False).agg(
+        _last_games=("_played", "sum"), _last_carries=("_carries", "sum"),
+        _last_yards=("_yards", "sum"), _last_team=("team", "last"))
+    team_season = (
+        team_week.groupby(["season", "team"], as_index=False)["_team_carries"].sum()
+        .rename(columns={"team": "_last_team", "_team_carries": "_last_team_carries"})
+    )
+    last = last.merge(team_season, on=["season", "_last_team"], how="left")
+    last["season"] = last["season"] + 1
+    last = frame[["player_id", "season"]].merge(last, on=["player_id", "season"], how="left")
+
+    carries_pg = shrink_toward_prior(
+        safe_ratio(carries_before, games_before),
+        safe_ratio(last["_last_carries"], last["_last_games"]),
+        games_before, RUSH_VOLUME_SHRINKAGE_GAMES)
+    yards_pg = shrink_toward_prior(
+        safe_ratio(yards_before, games_before),
+        safe_ratio(last["_last_yards"], last["_last_games"]),
+        games_before, RUSH_YARDS_SHRINKAGE_GAMES)
+    carry_share = shrink_toward_prior(
+        safe_ratio(carries_before, team_before),
+        safe_ratio(last["_last_carries"], last["_last_team_carries"]),
+        games_before, RUSH_VOLUME_SHRINKAGE_GAMES)
+
+    pooled_carries = carries_before + last["_last_carries"].fillna(0.0)
+    ypc = safe_ratio(yards_pg, carries_pg).where(pooled_carries >= MIN_CARRIES_FOR_YPC)
+
+    # Last few games actually played, carried across the season boundary, so
+    # week 1 reads the end of last season. Average through each played game,
+    # then each row reads the value as of the row before it, skipping its own game.
+    played_rows = frame[frame["_played"] == 1]
+    through_game = pd.Series(np.nan, index=frame.index)
+    through_game[played_rows.index] = (
+        played_rows.groupby("player_id")["_carries"]
+        .transform(lambda s: s.rolling(RECENT_GAMES, min_periods=1).mean())
+    )
+    recent_carries = through_game.groupby(frame["player_id"]).transform(lambda s: s.ffill().shift(1))
+
+    result["carries_per_game"] = carries_pg
+    result["rush_yds_per_game"] = yards_pg
+    result["yards_per_carry"] = ypc
+    result["carry_share_of_team"] = carry_share
+    result["carries_last3"] = recent_carries
     return result
 
 
@@ -248,6 +374,7 @@ def main() -> None:
 
     result = build_matchup_features(result, team_aggs)
     result = build_usage_trend_features(result)
+    result = build_rushing_features(result)
     result = build_depth_chart_features(result)
     result = build_player_target_share(result)
     result = build_seasonal_context_features(result)
@@ -272,6 +399,8 @@ def main() -> None:
         "target_share_trend", "weeks_into_season", "games_played_this_szn",
         "bye_week_passed", "weeks_since_injury", "prev_injuries_this_szn", "rest_days",
         "depth_chart_position", "player_target_share_of_team",
+        "carries_per_game", "rush_yds_per_game", "yards_per_carry", "carry_share_of_team",
+        "carries_last3",
     ]
 
     expected_ranges = {
@@ -286,6 +415,11 @@ def main() -> None:
         "rest_days": (3, 20),
         "depth_chart_position": (0.1, 1.0),
         "player_target_share_of_team": (0, 1),
+        "carries_per_game": (0, 40),
+        "rush_yds_per_game": (-20, 250),
+        "yards_per_carry": (-5, 15),
+        "carry_share_of_team": (0, 1),
+        "carries_last3": (0, 45),
     }
 
     for col in new_cols:
@@ -317,7 +451,9 @@ def main() -> None:
     for col in new_cols:
         n_null = result[col].isna().sum()
         print(f"  {col}: {n_null} nulls")
-    print("  usage_trend/target_share_trend nulls expected for rookies or players with no prior-season data.")
+    print("  usage_trend/target_share_trend nulls expected in week 1 (no prior weeks), for rookies, and for players with no prior-season data.")
+    print("  rushing feature nulls expected for a rookie's first game; yards_per_carry is null under "
+          f"{MIN_CARRIES_FOR_YPC:.0f} carries.")
     print("  opp_def_strength_for_position/matchup_advantage_score nulls expected for non-RB/WR/TE/QB positions.")
     print("  bye_week_passed nulls expected when a team's bye week could not be determined from the data.")
 

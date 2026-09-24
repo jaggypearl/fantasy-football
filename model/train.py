@@ -1,3 +1,4 @@
+import argparse
 import json
 import pickle
 from pathlib import Path
@@ -198,7 +199,8 @@ def ppr_from_stats(stats: dict[str, np.ndarray], n_rows: int) -> np.ndarray:
     return total
 
 
-def train_position(df: pd.DataFrame, position: str, feature_cols: list[str]) -> tuple[dict, dict]:
+def train_position(df: pd.DataFrame, position: str, feature_cols: list[str],
+                   model_dir: Path = MODEL_DIR) -> tuple[dict, dict]:
     subset = df[df["bio_position"] == position]
     train_df, val_df, test_df = split_by_season(subset)
 
@@ -271,7 +273,7 @@ def train_position(df: pd.DataFrame, position: str, feature_cols: list[str]) -> 
         for rank, row in enumerate(importance.itertuples(index=False), start=1):
             print(f"        {rank:2d}. {row.feature:<45} {row.importance:.4f}")
 
-        model_path = MODEL_DIR / f"{stat}_{position.lower()}_model.pkl"
+        model_path = model_dir / f"{stat}_{position.lower()}_model.pkl"
         with model_path.open("wb") as fh:
             pickle.dump(model, fh)
 
@@ -297,21 +299,43 @@ def train_position(df: pd.DataFrame, position: str, feature_cols: list[str]) -> 
     return stat_meta, ppr_info
 
 
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Train the per-position stat models.")
+    parser.add_argument("--model-dir", type=Path, default=MODEL_DIR,
+                        help="where to write the models and metadata (default: model/). Point this at a "
+                             "scratch folder to train a candidate without replacing the live models.")
+    parser.add_argument("--data", type=Path, default=DATA_PATH, help="training parquet")
+    parser.add_argument("--drop-features", nargs="*", default=[], metavar="COL",
+                        help="feature columns to leave out, for ablations")
+    return parser.parse_args()
+
+
 def main() -> None:
+    args = parse_args()
+    model_dir = args.model_dir.resolve()
+    metadata_path = model_dir / METADATA_PATH.name
+
     print("=" * 80)
     print("POSITION-SPECIFIC STAT MODELS -> PPR RECONSTRUCTION")
     print("=" * 80)
 
-    MODEL_DIR.mkdir(parents=True, exist_ok=True)
+    model_dir.mkdir(parents=True, exist_ok=True)
     if LEGACY_MODEL_PATH.exists():
         LEGACY_MODEL_PATH.unlink()
         print(f"\nRemoved leaked legacy model: {LEGACY_MODEL_PATH.name}")
 
-    df = pd.read_parquet(DATA_PATH)
+    df = pd.read_parquet(args.data)
     df = coerce_numeric(df)
-    print(f"Loaded {DATA_PATH.name}: {len(df):,} rows x {len(df.columns)} columns")
+    print(f"Loaded {args.data.name}: {len(df):,} rows x {len(df.columns)} columns")
+    print(f"Writing models to {model_dir}")
 
     feature_cols, excluded = select_feature_columns(df)
+    if args.drop_features:
+        missing = [c for c in args.drop_features if c not in feature_cols]
+        if missing:
+            raise ValueError(f"--drop-features names columns that are not features: {missing}")
+        feature_cols = [c for c in feature_cols if c not in args.drop_features]
+        print(f"Ablation: left out {args.drop_features}")
     print(f"\nExcluded {len(excluded)} numeric columns as game outcomes or identifiers")
     print(f"Pre-game feature candidates: {len(feature_cols)}")
     for col in feature_cols:
@@ -333,7 +357,7 @@ def main() -> None:
     all_oracle: list[np.ndarray] = []
 
     for position in POSITION_TARGETS:
-        stat_meta, ppr_info = train_position(df, position, feature_cols)
+        stat_meta, ppr_info = train_position(df, position, feature_cols, model_dir)
         if not stat_meta:
             continue
         positions_meta[position] = stat_meta
@@ -373,7 +397,7 @@ def main() -> None:
         "excluded_columns": excluded,
         "leakage_review": flagged,
     }
-    with METADATA_PATH.open("w", encoding="utf-8") as fh:
+    with metadata_path.open("w", encoding="utf-8") as fh:
         json.dump(metadata, fh, indent=2)
 
     print("\n" + "=" * 80)
@@ -403,7 +427,7 @@ def main() -> None:
     if overall_metrics["mae"] < 2.0:
         print("  FLAG: MAE below 2.0 is suspiciously low for pre-game prediction. Re-check the")
         print("        feature list above for a column that encodes in-game outcomes.")
-    print(f"\n  Metadata: {METADATA_PATH}")
+    print(f"\n  Metadata: {metadata_path}")
     print("=" * 80)
 
 

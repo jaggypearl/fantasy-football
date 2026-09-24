@@ -38,20 +38,15 @@
           "def_strength_vs_wr",
           "def_strength_vs_te",
           "def_strength_vs_qb",
-          "team_target_share_to_wr_y",
-          "team_target_share_to_te_y",
-          "team_target_share_to_rb_y",
-          "team_rush_share_to_rb_y",
+          "team_target_share_to_wr",
+          "team_target_share_to_te",
+          "team_target_share_to_rb",
+          "team_rush_share_to_rb",
           "preseason_sos_y",
           "adjusted_sos_y",
           "opp_def_strength_for_position",
           "matchup_advantage_score",
           "usage_trend",
-          "carries_per_game",
-          "rush_yds_per_game",
-          "yards_per_carry",
-          "carry_share_of_team",
-          "carries_last3",
           "depth_chart_position",
           "player_target_share_of_team",
           "weeks_into_season",
@@ -64,63 +59,63 @@
         "feature_importance": [
           {
             "feature": "depth_chart_position",
-            "importance": 0.3346651792526245
+            "importance": 0.27626603841781616
           },
           {
             "feature": "weeks_since_injury",
-            "importance": 0.10305682569742203
+            "importance": 0.11395631730556488
           },
           {
             "feature": "prev_injuries_this_szn",
-            "importance": 0.07350552827119827
-          },
-          {
-            "feature": "carry_share_of_team",
-            "importance": 0.032948072999715805
-          },
-          {
-            "feature": "player_target_share_of_team",
-            "importance": 0.019363977015018463
-          },
-          {
-            "feature": "total_line",
-            "importance": 0.018987005576491356
-          },
-          {
-            "feature": "vegas_team_line",
-            "importance": 0.014803553000092506
-          },
-          {
-            "feature": "games_played_this_szn",
-            "importance": 0.013378382660448551
-          },
-          {
-            "feature": "bio_height",
-            "importance": 0.012758776545524597
-          },
-          {
-            "feature": "bio_draft_number",
-            "importance": 0.012719456106424332
-          },
-          {
-            "feature": "team_rush_share_to_rb_y",
-            "importance": 0.012132321484386921
-          },
-          {
-            "feature": "bio_rookie_year",
-            "importance": 0.011562415398657322
-          },
-          {
-            "feature": "adjusted_sos_x",
-            "importance": 0.011514396406710148
-          },
-          {
-            "feature": "adjusted_sos_y",
-            "importance": 0.01115633174777031
+            "importance": 0.08135546743869781
           },
           {
             "feature": "usage_trend",
-            "importance": 0.010842511430382729
+            "importance": 0.047433774918317795
+          },
+          {
+            "feature": "player_target_share_of_team",
+            "importance": 0.025513755157589912
+          },
+          {
+            "feature": "games_played_this_szn",
+            "importance": 0.021327631548047066
+          },
+          {
+            "feature": "total_line",
+            "importance": 0.018694061785936356
+          },
+          {
+            "feature": "vegas_team_line",
+            "importance": 0.01786644756793976
+          },
+          {
+            "feature": "team_rush_share_to_rb",
+            "importance": 0.016989845782518387
+          },
+          {
+            "feature": "bio_draft_number",
+            "importance": 0.014755001291632652
+          },
+          {
+            "feature": "adjusted_sos_y",
+            "importance": 0.014234678819775581
+          },
+          {
+            "feature": "bio_height",
+            "importance": 0.013192486017942429
+          },
+          {
+            "feature": "bio_age",
+            "importance": 0.013090003281831741
+          },
+          {
+            "feature": "bio_entry_year",
+            "importance": 0.013021301478147507
+          },
+          {
+            "feature": "def_strength_vs_te",
+            "importance": 0.012987636029720306
           }
         ],
         "scaler_mean": [
@@ -166,12 +161,7 @@
           0.5004934179727915,
           3.2063659584473325,
           -0.00012482566155094606,
-          0.9951951635846242,
-          2.7946647061074232,
-          11.58349427768251,
-          2.9480317450330107,
-          0.08726928919883167,
-          2.7730654761904763,
+          0.7357597279055827,
           0.8568106312292358,
           0.0005605646320327309,
           9.340116279069768,
@@ -224,12 +214,7 @@
           0.03209797498247554,
           0.6038709818302243,
           0.5877296844163223,
-          2.3423985995152092,
-          1.8773143094976092,
-          12.275838191329042,
-          2.265430518096696,
-          0.06608845870733207,
-          2.1511387755782505,
+          1.5145687455273422,
           0.24667077744458604,
           0.0036958840417339587,
           5.07988283536448,
@@ -239,9 +224,9 @@
           1.0341998288217966,
           2.0104266243145084
         ],
-        "test_mae": 8.223707340686257,
-        "test_rmse": 10.657216353076576,
-        "test_r2": 0.5158967515629991,
+        "test_mae": 8.541208477274516,
+        "test_rmse": 11.011198289129581,
+        "test_r2": 0.49039015725416035,
         "model_path": "passing_attempts_qb_model.pkl"
       },
       "passing_yards": {
@@ -281,20 +266,15 @@
           "def_strength_vs_wr",
           "def_strength_vs_te",
           "def_strength_vs_qb",
-          "team_target_share_to_wr_y",
-          "team_target_share_to_te_y",
-          "team_target_share_to_rb_y",
-          "team_rush_share_to_rb_y",
+          "team_target_share_to_wr",
+          "team_target_share_to_te",
+          "team_target_share_to_rb",
+          "team_rush_share_to_rb",
           "preseason_sos_y",
           "adjusted_sos_y",
           "opp_def_strength_for_position",
           "matchup_advantage_score",
           "usage_trend",
-          "carries_per_game",
-          "rush_yds_per_game",
-          "yards_per_carry",
-          "carry_share_of_team",
-          "carries_last3",
           "depth_chart_position",
           "player_target_share_of_team",
           "weeks_into_season",
@@ -307,63 +287,63 @@
         "feature_importance": [
           {
             "feature": "depth_chart_position",
-            "importance": 0.3684089183807373
-          },
-          {
-            "feature": "weeks_since_injury",
-            "importance": 0.0852946862578392
+            "importance": 0.277654767036438
           },
           {
             "feature": "prev_injuries_this_szn",
-            "importance": 0.07387226074934006
+            "importance": 0.13671860098838806
           },
           {
-            "feature": "carry_share_of_team",
-            "importance": 0.035802219063043594
+            "feature": "weeks_since_injury",
+            "importance": 0.09603321552276611
+          },
+          {
+            "feature": "usage_trend",
+            "importance": 0.043458491563797
           },
           {
             "feature": "total_line",
-            "importance": 0.02424369379878044
-          },
-          {
-            "feature": "player_target_share_of_team",
-            "importance": 0.017649248242378235
-          },
-          {
-            "feature": "bio_rookie_year",
-            "importance": 0.01568361185491085
-          },
-          {
-            "feature": "bio_entry_year",
-            "importance": 0.01290565263479948
-          },
-          {
-            "feature": "weeks_into_season",
-            "importance": 0.012348692864179611
-          },
-          {
-            "feature": "vegas_team_line",
-            "importance": 0.012220283038914204
-          },
-          {
-            "feature": "team_rush_share_to_rb_y",
-            "importance": 0.011894656345248222
+            "importance": 0.02263861894607544
           },
           {
             "feature": "is_home",
-            "importance": 0.01149233989417553
+            "importance": 0.020136496052145958
           },
           {
-            "feature": "adjusted_sos_x",
-            "importance": 0.010973808355629444
-          },
-          {
-            "feature": "def_strength_vs_wr",
-            "importance": 0.010913573205471039
+            "feature": "player_target_share_of_team",
+            "importance": 0.019866205751895905
           },
           {
             "feature": "games_played_this_szn",
-            "importance": 0.010635209269821644
+            "importance": 0.018595796078443527
+          },
+          {
+            "feature": "bio_entry_year",
+            "importance": 0.01435165200382471
+          },
+          {
+            "feature": "team_rush_share_to_rb",
+            "importance": 0.013951912522315979
+          },
+          {
+            "feature": "bio_rookie_year",
+            "importance": 0.013580454513430595
+          },
+          {
+            "feature": "vegas_team_line",
+            "importance": 0.013099596835672855
+          },
+          {
+            "feature": "team_target_share_to_rb",
+            "importance": 0.012967819347977638
+          },
+          {
+            "feature": "bio_draft_number",
+            "importance": 0.012809984385967255
+          },
+          {
+            "feature": "bio_age",
+            "importance": 0.011667764745652676
           }
         ],
         "scaler_mean": [
@@ -409,12 +389,7 @@
           0.5004934179727915,
           3.2063659584473325,
           -0.00012482566155094606,
-          0.9951951635846242,
-          2.7946647061074232,
-          11.58349427768251,
-          2.9480317450330107,
-          0.08726928919883167,
-          2.7730654761904763,
+          0.7357597279055827,
           0.8568106312292358,
           0.0005605646320327309,
           9.340116279069768,
@@ -467,12 +442,7 @@
           0.03209797498247554,
           0.6038709818302243,
           0.5877296844163223,
-          2.3423985995152092,
-          1.8773143094976092,
-          12.275838191329042,
-          2.265430518096696,
-          0.06608845870733207,
-          2.1511387755782505,
+          1.5145687455273422,
           0.24667077744458604,
           0.0036958840417339587,
           5.07988283536448,
@@ -482,9 +452,9 @@
           1.0341998288217966,
           2.0104266243145084
         ],
-        "test_mae": 65.16205353070036,
-        "test_rmse": 82.57490398719388,
-        "test_r2": 0.4860926564660234,
+        "test_mae": 65.029086479891,
+        "test_rmse": 82.61371771438222,
+        "test_r2": 0.48560942617790837,
         "model_path": "passing_yards_qb_model.pkl"
       },
       "passing_tds": {
@@ -524,20 +494,15 @@
           "def_strength_vs_wr",
           "def_strength_vs_te",
           "def_strength_vs_qb",
-          "team_target_share_to_wr_y",
-          "team_target_share_to_te_y",
-          "team_target_share_to_rb_y",
-          "team_rush_share_to_rb_y",
+          "team_target_share_to_wr",
+          "team_target_share_to_te",
+          "team_target_share_to_rb",
+          "team_rush_share_to_rb",
           "preseason_sos_y",
           "adjusted_sos_y",
           "opp_def_strength_for_position",
           "matchup_advantage_score",
           "usage_trend",
-          "carries_per_game",
-          "rush_yds_per_game",
-          "yards_per_carry",
-          "carry_share_of_team",
-          "carries_last3",
           "depth_chart_position",
           "player_target_share_of_team",
           "weeks_into_season",
@@ -550,63 +515,63 @@
         "feature_importance": [
           {
             "feature": "depth_chart_position",
-            "importance": 0.20414850115776062
+            "importance": 0.1675071269273758
           },
           {
             "feature": "weeks_since_injury",
-            "importance": 0.08200511336326599
+            "importance": 0.08013016730546951
           },
           {
             "feature": "prev_injuries_this_szn",
-            "importance": 0.03699490427970886
+            "importance": 0.07032154500484467
           },
           {
-            "feature": "bio_rookie_year",
-            "importance": 0.03418024256825447
+            "feature": "usage_trend",
+            "importance": 0.03602268546819687
           },
           {
             "feature": "total_line",
-            "importance": 0.028601575642824173
-          },
-          {
-            "feature": "carry_share_of_team",
-            "importance": 0.028176985681056976
-          },
-          {
-            "feature": "adjusted_sos_y",
-            "importance": 0.02179834060370922
-          },
-          {
-            "feature": "oline_rank",
-            "importance": 0.020443877205252647
-          },
-          {
-            "feature": "vegas_team_line",
-            "importance": 0.01987966150045395
-          },
-          {
-            "feature": "adjusted_sos_x",
-            "importance": 0.018693098798394203
+            "importance": 0.030168460682034492
           },
           {
             "feature": "player_target_share_of_team",
-            "importance": 0.016145646572113037
-          },
-          {
-            "feature": "def_strength_vs_te",
-            "importance": 0.015691053122282028
+            "importance": 0.022246940061450005
           },
           {
             "feature": "is_home",
-            "importance": 0.015144554898142815
+            "importance": 0.021640850231051445
           },
           {
-            "feature": "bio_draft_number",
-            "importance": 0.014737621881067753
+            "feature": "oline_rank",
+            "importance": 0.02062716893851757
           },
           {
-            "feature": "preseason_sos_y",
-            "importance": 0.014721021056175232
+            "feature": "adjusted_sos_x",
+            "importance": 0.020430970937013626
+          },
+          {
+            "feature": "bio_entry_year",
+            "importance": 0.019986797124147415
+          },
+          {
+            "feature": "adjusted_sos_y",
+            "importance": 0.019801171496510506
+          },
+          {
+            "feature": "vegas_team_line",
+            "importance": 0.019582757726311684
+          },
+          {
+            "feature": "bio_rookie_year",
+            "importance": 0.018073085695505142
+          },
+          {
+            "feature": "games_played_this_szn",
+            "importance": 0.017982186749577522
+          },
+          {
+            "feature": "team_target_share_to_rb",
+            "importance": 0.016434358432888985
           }
         ],
         "scaler_mean": [
@@ -652,12 +617,7 @@
           0.5004934179727915,
           3.2063659584473325,
           -0.00012482566155094606,
-          0.9951951635846242,
-          2.7946647061074232,
-          11.58349427768251,
-          2.9480317450330107,
-          0.08726928919883167,
-          2.7730654761904763,
+          0.7357597279055827,
           0.8568106312292358,
           0.0005605646320327309,
           9.340116279069768,
@@ -710,12 +670,7 @@
           0.03209797498247554,
           0.6038709818302243,
           0.5877296844163223,
-          2.3423985995152092,
-          1.8773143094976092,
-          12.275838191329042,
-          2.265430518096696,
-          0.06608845870733207,
-          2.1511387755782505,
+          1.5145687455273422,
           0.24667077744458604,
           0.0036958840417339587,
           5.07988283536448,
@@ -725,9 +680,9 @@
           1.0341998288217966,
           2.0104266243145084
         ],
-        "test_mae": 0.7768159804575497,
-        "test_rmse": 1.009627147232834,
-        "test_r2": 0.25289669738338627,
+        "test_mae": 0.7820015219176999,
+        "test_rmse": 1.0138757140794323,
+        "test_r2": 0.24659576388753002,
         "model_path": "passing_tds_qb_model.pkl"
       },
       "interceptions": {
@@ -767,20 +722,15 @@
           "def_strength_vs_wr",
           "def_strength_vs_te",
           "def_strength_vs_qb",
-          "team_target_share_to_wr_y",
-          "team_target_share_to_te_y",
-          "team_target_share_to_rb_y",
-          "team_rush_share_to_rb_y",
+          "team_target_share_to_wr",
+          "team_target_share_to_te",
+          "team_target_share_to_rb",
+          "team_rush_share_to_rb",
           "preseason_sos_y",
           "adjusted_sos_y",
           "opp_def_strength_for_position",
           "matchup_advantage_score",
           "usage_trend",
-          "carries_per_game",
-          "rush_yds_per_game",
-          "yards_per_carry",
-          "carry_share_of_team",
-          "carries_last3",
           "depth_chart_position",
           "player_target_share_of_team",
           "weeks_into_season",
@@ -793,63 +743,63 @@
         "feature_importance": [
           {
             "feature": "depth_chart_position",
-            "importance": 0.08123867213726044
+            "importance": 0.07328236103057861
           },
           {
             "feature": "weeks_since_injury",
-            "importance": 0.05034821107983589
-          },
-          {
-            "feature": "opp_def_strength_for_position",
-            "importance": 0.028226085007190704
-          },
-          {
-            "feature": "matchup_advantage_score",
-            "importance": 0.024484025314450264
-          },
-          {
-            "feature": "team_rush_share_to_rb_y",
-            "importance": 0.02205635793507099
-          },
-          {
-            "feature": "bio_draft_number",
-            "importance": 0.019823145121335983
-          },
-          {
-            "feature": "team_target_share_to_wr_y",
-            "importance": 0.01954725943505764
-          },
-          {
-            "feature": "preseason_sos_x",
-            "importance": 0.019390525296330452
+            "importance": 0.05175706371665001
           },
           {
             "feature": "prev_injuries_this_szn",
-            "importance": 0.019348423928022385
+            "importance": 0.0347430482506752
+          },
+          {
+            "feature": "opp_def_strength_for_position",
+            "importance": 0.030403854325413704
+          },
+          {
+            "feature": "matchup_advantage_score",
+            "importance": 0.026014355942606926
+          },
+          {
+            "feature": "team_rush_share_to_rb",
+            "importance": 0.02467026747763157
+          },
+          {
+            "feature": "player_target_share_of_team",
+            "importance": 0.023189205676317215
+          },
+          {
+            "feature": "bio_draft_number",
+            "importance": 0.022540198639035225
           },
           {
             "feature": "def_strength_vs_rb",
-            "importance": 0.019252432510256767
+            "importance": 0.021432314068078995
           },
           {
-            "feature": "carry_share_of_team",
-            "importance": 0.01916094496846199
+            "feature": "adjusted_sos_y",
+            "importance": 0.02099515125155449
           },
           {
-            "feature": "bio_weight",
-            "importance": 0.019038761034607887
+            "feature": "team_target_share_to_wr",
+            "importance": 0.02004428766667843
           },
           {
-            "feature": "adjusted_sos_x",
-            "importance": 0.01877082698047161
-          },
-          {
-            "feature": "rush_yds_per_game",
-            "importance": 0.018449364230036736
+            "feature": "div_game",
+            "importance": 0.019991416484117508
           },
           {
             "feature": "def_strength_vs_qb",
-            "importance": 0.018392901867628098
+            "importance": 0.019940085709095
+          },
+          {
+            "feature": "adjusted_sos_x",
+            "importance": 0.01980859972536564
+          },
+          {
+            "feature": "vegas_team_line",
+            "importance": 0.019614215940237045
           }
         ],
         "scaler_mean": [
@@ -895,12 +845,7 @@
           0.5004934179727915,
           3.2063659584473325,
           -0.00012482566155094606,
-          0.9951951635846242,
-          2.7946647061074232,
-          11.58349427768251,
-          2.9480317450330107,
-          0.08726928919883167,
-          2.7730654761904763,
+          0.7357597279055827,
           0.8568106312292358,
           0.0005605646320327309,
           9.340116279069768,
@@ -953,12 +898,7 @@
           0.03209797498247554,
           0.6038709818302243,
           0.5877296844163223,
-          2.3423985995152092,
-          1.8773143094976092,
-          12.275838191329042,
-          2.265430518096696,
-          0.06608845870733207,
-          2.1511387755782505,
+          1.5145687455273422,
           0.24667077744458604,
           0.0036958840417339587,
           5.07988283536448,
@@ -968,9 +908,9 @@
           1.0341998288217966,
           2.0104266243145084
         ],
-        "test_mae": 0.5852423911750089,
-        "test_rmse": 0.7269297568105849,
-        "test_r2": 0.06287183946873187,
+        "test_mae": 0.5836742639144357,
+        "test_rmse": 0.73295911715853,
+        "test_r2": 0.047261759291010286,
         "model_path": "interceptions_qb_model.pkl"
       },
       "rushing_yards": {
@@ -1010,20 +950,15 @@
           "def_strength_vs_wr",
           "def_strength_vs_te",
           "def_strength_vs_qb",
-          "team_target_share_to_wr_y",
-          "team_target_share_to_te_y",
-          "team_target_share_to_rb_y",
-          "team_rush_share_to_rb_y",
+          "team_target_share_to_wr",
+          "team_target_share_to_te",
+          "team_target_share_to_rb",
+          "team_rush_share_to_rb",
           "preseason_sos_y",
           "adjusted_sos_y",
           "opp_def_strength_for_position",
           "matchup_advantage_score",
           "usage_trend",
-          "carries_per_game",
-          "rush_yds_per_game",
-          "yards_per_carry",
-          "carry_share_of_team",
-          "carries_last3",
           "depth_chart_position",
           "player_target_share_of_team",
           "weeks_into_season",
@@ -1035,64 +970,64 @@
         ],
         "feature_importance": [
           {
-            "feature": "rush_yds_per_game",
-            "importance": 0.09921742975711823
+            "feature": "depth_chart_position",
+            "importance": 0.09241992980241776
           },
           {
-            "feature": "carries_per_game",
-            "importance": 0.0742373913526535
-          },
-          {
-            "feature": "team_rush_share_to_rb_y",
-            "importance": 0.050120677798986435
+            "feature": "team_rush_share_to_rb",
+            "importance": 0.08340749889612198
           },
           {
             "feature": "weeks_since_injury",
-            "importance": 0.04433688148856163
+            "importance": 0.039115060120821
           },
           {
-            "feature": "carry_share_of_team",
-            "importance": 0.03714386746287346
+            "feature": "bio_entry_year",
+            "importance": 0.03690103068947792
           },
           {
             "feature": "prev_injuries_this_szn",
-            "importance": 0.03247766196727753
+            "importance": 0.03560556098818779
           },
           {
-            "feature": "depth_chart_position",
-            "importance": 0.031012549996376038
+            "feature": "usage_trend",
+            "importance": 0.033442575484514236
           },
           {
             "feature": "oline_rank",
-            "importance": 0.028892843052744865
+            "importance": 0.031041041016578674
           },
           {
-            "feature": "carries_last3",
-            "importance": 0.023136580362915993
+            "feature": "bio_age",
+            "importance": 0.03033776581287384
           },
           {
             "feature": "preseason_sos_y",
-            "importance": 0.02200997620820999
+            "importance": 0.026927413418889046
           },
           {
-            "feature": "bye_week_passed",
-            "importance": 0.021845197305083275
+            "feature": "bio_years_exp",
+            "importance": 0.026759706437587738
           },
           {
             "feature": "def_strength_vs_te",
-            "importance": 0.016321862116456032
+            "importance": 0.024376848712563515
           },
           {
-            "feature": "rest_days",
-            "importance": 0.016285976395010948
+            "feature": "bio_draft_number",
+            "importance": 0.02195987105369568
           },
           {
             "feature": "adjusted_sos_y",
-            "importance": 0.015462585724890232
+            "importance": 0.02037021517753601
           },
           {
-            "feature": "total_line",
-            "importance": 0.015186251141130924
+            "feature": "bio_height",
+            "importance": 0.019245300441980362
+          },
+          {
+            "feature": "player_target_share_of_team",
+            "importance": 0.01854323223233223
           }
         ],
         "scaler_mean": [
@@ -1138,12 +1073,7 @@
           0.5004934179727915,
           3.2063659584473325,
           -0.00012482566155094606,
-          0.9951951635846242,
-          2.7946647061074232,
-          11.58349427768251,
-          2.9480317450330107,
-          0.08726928919883167,
-          2.7730654761904763,
+          0.7357597279055827,
           0.8568106312292358,
           0.0005605646320327309,
           9.340116279069768,
@@ -1196,12 +1126,7 @@
           0.03209797498247554,
           0.6038709818302243,
           0.5877296844163223,
-          2.3423985995152092,
-          1.8773143094976092,
-          12.275838191329042,
-          2.265430518096696,
-          0.06608845870733207,
-          2.1511387755782505,
+          1.5145687455273422,
           0.24667077744458604,
           0.0036958840417339587,
           5.07988283536448,
@@ -1211,9 +1136,9 @@
           1.0341998288217966,
           2.0104266243145084
         ],
-        "test_mae": 10.909021451308048,
-        "test_rmse": 14.814854062834529,
-        "test_r2": 0.24892662010223565,
+        "test_mae": 11.160565041724027,
+        "test_rmse": 15.174622844135,
+        "test_r2": 0.21214997244037526,
         "model_path": "rushing_yards_qb_model.pkl"
       },
       "rushing_tds": {
@@ -1253,20 +1178,15 @@
           "def_strength_vs_wr",
           "def_strength_vs_te",
           "def_strength_vs_qb",
-          "team_target_share_to_wr_y",
-          "team_target_share_to_te_y",
-          "team_target_share_to_rb_y",
-          "team_rush_share_to_rb_y",
+          "team_target_share_to_wr",
+          "team_target_share_to_te",
+          "team_target_share_to_rb",
+          "team_rush_share_to_rb",
           "preseason_sos_y",
           "adjusted_sos_y",
           "opp_def_strength_for_position",
           "matchup_advantage_score",
           "usage_trend",
-          "carries_per_game",
-          "rush_yds_per_game",
-          "yards_per_carry",
-          "carry_share_of_team",
-          "carries_last3",
           "depth_chart_position",
           "player_target_share_of_team",
           "weeks_into_season",
@@ -1278,64 +1198,64 @@
         ],
         "feature_importance": [
           {
-            "feature": "carries_per_game",
-            "importance": 0.03216734156012535
+            "feature": "team_rush_share_to_rb",
+            "importance": 0.03572278097271919
           },
           {
-            "feature": "carries_last3",
-            "importance": 0.031390443444252014
-          },
-          {
-            "feature": "rush_yds_per_game",
-            "importance": 0.026477374136447906
-          },
-          {
-            "feature": "adjusted_sos_y",
-            "importance": 0.024917589500546455
-          },
-          {
-            "feature": "oline_rank",
-            "importance": 0.024823566898703575
-          },
-          {
-            "feature": "is_home",
-            "importance": 0.02421480417251587
+            "feature": "preseason_sos_y",
+            "importance": 0.028177129104733467
           },
           {
             "feature": "div_game",
-            "importance": 0.02407204732298851
+            "importance": 0.027794089168310165
           },
           {
-            "feature": "team_rush_share_to_rb_y",
-            "importance": 0.022557759657502174
+            "feature": "oline_rank",
+            "importance": 0.027696983888745308
           },
           {
-            "feature": "opp_def_strength_for_position",
-            "importance": 0.02208635024726391
+            "feature": "bio_entry_year",
+            "importance": 0.02495143562555313
           },
           {
-            "feature": "usage_trend",
-            "importance": 0.021425282582640648
+            "feature": "preseason_sos_x",
+            "importance": 0.024726079776883125
           },
           {
-            "feature": "implied_away_total",
-            "importance": 0.020690852776169777
-          },
-          {
-            "feature": "team_target_share_to_wr_y",
-            "importance": 0.020589657127857208
+            "feature": "weeks_into_season",
+            "importance": 0.024664318189024925
           },
           {
             "feature": "home_spread_odds",
-            "importance": 0.02015059068799019
+            "importance": 0.024287311360239983
+          },
+          {
+            "feature": "bio_draft_number",
+            "importance": 0.024184755980968475
+          },
+          {
+            "feature": "depth_chart_position",
+            "importance": 0.0241334680467844
+          },
+          {
+            "feature": "def_strength_vs_qb",
+            "importance": 0.023682856932282448
+          },
+          {
+            "feature": "bio_weight",
+            "importance": 0.022868048399686813
+          },
+          {
+            "feature": "usage_trend",
+            "importance": 0.022829297930002213
           },
           {
             "feature": "games_played_this_szn",
-            "importance": 0.019932636991143227
+            "importance": 0.021583445370197296
           },
           {
-            "feature": "prev_injuries_this_szn",
-            "importance": 0.019775383174419403
+            "feature": "is_home",
+            "importance": 0.02132418192923069
           }
         ],
         "scaler_mean": [
@@ -1381,12 +1301,7 @@
           0.5004934179727915,
           3.2063659584473325,
           -0.00012482566155094606,
-          0.9951951635846242,
-          2.7946647061074232,
-          11.58349427768251,
-          2.9480317450330107,
-          0.08726928919883167,
-          2.7730654761904763,
+          0.7357597279055827,
           0.8568106312292358,
           0.0005605646320327309,
           9.340116279069768,
@@ -1439,12 +1354,7 @@
           0.03209797498247554,
           0.6038709818302243,
           0.5877296844163223,
-          2.3423985995152092,
-          1.8773143094976092,
-          12.275838191329042,
-          2.265430518096696,
-          0.06608845870733207,
-          2.1511387755782505,
+          1.5145687455273422,
           0.24667077744458604,
           0.0036958840417339587,
           5.07988283536448,
@@ -1454,9 +1364,9 @@
           1.0341998288217966,
           2.0104266243145084
         ],
-        "test_mae": 0.24963934010990194,
-        "test_rmse": 0.41477836248951333,
-        "test_r2": 0.0029257196551377707,
+        "test_mae": 0.2512212562821401,
+        "test_rmse": 0.4206158216128417,
+        "test_r2": -0.025336783783174832,
         "model_path": "rushing_tds_qb_model.pkl"
       }
     },
@@ -1498,21 +1408,16 @@
           "def_strength_vs_wr",
           "def_strength_vs_te",
           "def_strength_vs_qb",
-          "team_target_share_to_wr_y",
-          "team_target_share_to_te_y",
-          "team_target_share_to_rb_y",
-          "team_rush_share_to_rb_y",
+          "team_target_share_to_wr",
+          "team_target_share_to_te",
+          "team_target_share_to_rb",
+          "team_rush_share_to_rb",
           "preseason_sos_y",
           "adjusted_sos_y",
           "opp_def_strength_for_position",
           "matchup_advantage_score",
           "usage_trend",
           "target_share_trend",
-          "carries_per_game",
-          "rush_yds_per_game",
-          "yards_per_carry",
-          "carry_share_of_team",
-          "carries_last3",
           "depth_chart_position",
           "player_target_share_of_team",
           "weeks_into_season",
@@ -1524,64 +1429,64 @@
         ],
         "feature_importance": [
           {
-            "feature": "carries_last3",
-            "importance": 0.21653950214385986
+            "feature": "depth_chart_position",
+            "importance": 0.15173999965190887
           },
           {
             "feature": "weeks_since_injury",
-            "importance": 0.10639312118291855
-          },
-          {
-            "feature": "carries_per_game",
-            "importance": 0.10620875656604767
-          },
-          {
-            "feature": "rush_yds_per_game",
-            "importance": 0.04833607003092766
-          },
-          {
-            "feature": "carry_share_of_team",
-            "importance": 0.03977018967270851
-          },
-          {
-            "feature": "depth_chart_position",
-            "importance": 0.028457563370466232
-          },
-          {
-            "feature": "prev_injuries_this_szn",
-            "importance": 0.02446271851658821
-          },
-          {
-            "feature": "games_played_this_szn",
-            "importance": 0.014685518108308315
-          },
-          {
-            "feature": "oline_rank",
-            "importance": 0.013089115731418133
-          },
-          {
-            "feature": "weeks_into_season",
-            "importance": 0.012381099164485931
-          },
-          {
-            "feature": "weather_wind",
-            "importance": 0.01129346713423729
+            "importance": 0.0872514471411705
           },
           {
             "feature": "player_target_share_of_team",
-            "importance": 0.01080397143959999
-          },
-          {
-            "feature": "bye_week_passed",
-            "importance": 0.010784137062728405
-          },
-          {
-            "feature": "adjusted_sos_x",
-            "importance": 0.010753190144896507
+            "importance": 0.07225114852190018
           },
           {
             "feature": "bio_draft_number",
-            "importance": 0.010562539100646973
+            "importance": 0.054855234920978546
+          },
+          {
+            "feature": "usage_trend",
+            "importance": 0.045141298323869705
+          },
+          {
+            "feature": "bio_weight",
+            "importance": 0.04315333813428879
+          },
+          {
+            "feature": "bio_rookie_year",
+            "importance": 0.02990216389298439
+          },
+          {
+            "feature": "bio_entry_year",
+            "importance": 0.026199158281087875
+          },
+          {
+            "feature": "bio_height",
+            "importance": 0.023181768134236336
+          },
+          {
+            "feature": "team_target_share_to_rb",
+            "importance": 0.02013099566102028
+          },
+          {
+            "feature": "team_target_share_to_wr",
+            "importance": 0.018733056262135506
+          },
+          {
+            "feature": "bio_age",
+            "importance": 0.018486127257347107
+          },
+          {
+            "feature": "team_rush_share_to_rb",
+            "importance": 0.018132580444216728
+          },
+          {
+            "feature": "bio_years_exp",
+            "importance": 0.017865188419818878
+          },
+          {
+            "feature": "prev_injuries_this_szn",
+            "importance": 0.017637362703680992
           }
         ],
         "scaler_mean": [
@@ -1627,13 +1532,8 @@
           0.4995158969884682,
           4.205701979470495,
           0.0023496116011874338,
-          1.3047371362564224,
-          0.8492537504558142,
-          7.841924857560996,
-          33.21285500454918,
-          4.2119178970900775,
-          0.2582682241195912,
-          7.897732709789939,
+          0.8508466095796374,
+          0.7315706950953376,
           0.6977774690929296,
           0.056430191883199234,
           9.193128675278974,
@@ -1686,13 +1586,8 @@
           0.03171664533413824,
           0.4473071052003988,
           0.43472958404909834,
-          4.400500265317505,
-          2.235005169648015,
-          5.435795261340748,
-          24.468663014858354,
-          0.874017305887839,
-          0.20301799880662671,
-          6.1645021059835745,
+          2.657362196450191,
+          1.9997681608904267,
           0.31197439521198306,
           0.05160411966545039,
           5.070569550895506,
@@ -1702,9 +1597,9 @@
           0.8533914580996739,
           2.012498733235083
         ],
-        "test_mae": 3.323652305574295,
-        "test_rmse": 4.512948575616768,
-        "test_r2": 0.5780660568252292,
+        "test_mae": 3.680389141266089,
+        "test_rmse": 4.918824921733509,
+        "test_r2": 0.5021280455350716,
         "model_path": "carries_rb_model.pkl"
       },
       "rushing_yards": {
@@ -1744,21 +1639,16 @@
           "def_strength_vs_wr",
           "def_strength_vs_te",
           "def_strength_vs_qb",
-          "team_target_share_to_wr_y",
-          "team_target_share_to_te_y",
-          "team_target_share_to_rb_y",
-          "team_rush_share_to_rb_y",
+          "team_target_share_to_wr",
+          "team_target_share_to_te",
+          "team_target_share_to_rb",
+          "team_rush_share_to_rb",
           "preseason_sos_y",
           "adjusted_sos_y",
           "opp_def_strength_for_position",
           "matchup_advantage_score",
           "usage_trend",
           "target_share_trend",
-          "carries_per_game",
-          "rush_yds_per_game",
-          "yards_per_carry",
-          "carry_share_of_team",
-          "carries_last3",
           "depth_chart_position",
           "player_target_share_of_team",
           "weeks_into_season",
@@ -1770,64 +1660,64 @@
         ],
         "feature_importance": [
           {
-            "feature": "carries_last3",
-            "importance": 0.16940954327583313
-          },
-          {
-            "feature": "rush_yds_per_game",
-            "importance": 0.09467478096485138
+            "feature": "depth_chart_position",
+            "importance": 0.13601551949977875
           },
           {
             "feature": "weeks_since_injury",
-            "importance": 0.08659609407186508
-          },
-          {
-            "feature": "oline_rank",
-            "importance": 0.04554380849003792
-          },
-          {
-            "feature": "depth_chart_position",
-            "importance": 0.028409864753484726
-          },
-          {
-            "feature": "prev_injuries_this_szn",
-            "importance": 0.024243313819169998
-          },
-          {
-            "feature": "carry_share_of_team",
-            "importance": 0.022413505241274834
-          },
-          {
-            "feature": "matchup_advantage_score",
-            "importance": 0.02124035730957985
-          },
-          {
-            "feature": "opp_def_strength_for_position",
-            "importance": 0.01785515993833542
-          },
-          {
-            "feature": "carries_per_game",
-            "importance": 0.0173202995210886
-          },
-          {
-            "feature": "games_played_this_szn",
-            "importance": 0.01640196144580841
+            "importance": 0.07376113533973694
           },
           {
             "feature": "player_target_share_of_team",
-            "importance": 0.012763728387653828
+            "importance": 0.05434266850352287
           },
           {
-            "feature": "preseason_sos_y",
-            "importance": 0.012715439312160015
+            "feature": "bio_draft_number",
+            "importance": 0.04286676645278931
+          },
+          {
+            "feature": "oline_rank",
+            "importance": 0.041429802775382996
+          },
+          {
+            "feature": "usage_trend",
+            "importance": 0.040326960384845734
+          },
+          {
+            "feature": "bio_weight",
+            "importance": 0.034367382526397705
+          },
+          {
+            "feature": "bio_rookie_year",
+            "importance": 0.02498425357043743
+          },
+          {
+            "feature": "adjusted_sos_y",
+            "importance": 0.022819269448518753
+          },
+          {
+            "feature": "bio_height",
+            "importance": 0.022554384544491768
+          },
+          {
+            "feature": "prev_injuries_this_szn",
+            "importance": 0.02217247150838375
           },
           {
             "feature": "bio_age",
-            "importance": 0.012619138695299625
+            "importance": 0.021891064941883087
           },
           {
-            "feature": "def_strength_vs_rb",
-            "importance": 0.012408725917339325
+            "feature": "team_target_share_to_rb",
+            "importance": 0.020487690344452858
+          },
+          {
+            "feature": "matchup_advantage_score",
+            "importance": 0.01901928335428238
+          },
+          {
+            "feature": "bio_entry_year",
+            "importance": 0.01893872208893299
           }
         ],
         "scaler_mean": [
@@ -1873,13 +1763,8 @@
           0.4995158969884682,
           4.205701979470495,
           0.0023496116011874338,
-          1.3047371362564224,
-          0.8492537504558142,
-          7.841924857560996,
-          33.21285500454918,
-          4.2119178970900775,
-          0.2582682241195912,
-          7.897732709789939,
+          0.8508466095796374,
+          0.7315706950953376,
           0.6977774690929296,
           0.056430191883199234,
           9.193128675278974,
@@ -1932,13 +1817,8 @@
           0.03171664533413824,
           0.4473071052003988,
           0.43472958404909834,
-          4.400500265317505,
-          2.235005169648015,
-          5.435795261340748,
-          24.468663014858354,
-          0.874017305887839,
-          0.20301799880662671,
-          6.1645021059835745,
+          2.657362196450191,
+          1.9997681608904267,
           0.31197439521198306,
           0.05160411966545039,
           5.070569550895506,
@@ -1948,9 +1828,9 @@
           0.8533914580996739,
           2.012498733235083
         ],
-        "test_mae": 18.814209033542348,
-        "test_rmse": 26.83093548191519,
-        "test_r2": 0.46431023594002996,
+        "test_mae": 19.16414767692391,
+        "test_rmse": 27.354933212908072,
+        "test_r2": 0.4332027546403797,
         "model_path": "rushing_yards_rb_model.pkl"
       },
       "rushing_tds": {
@@ -1990,21 +1870,16 @@
           "def_strength_vs_wr",
           "def_strength_vs_te",
           "def_strength_vs_qb",
-          "team_target_share_to_wr_y",
-          "team_target_share_to_te_y",
-          "team_target_share_to_rb_y",
-          "team_rush_share_to_rb_y",
+          "team_target_share_to_wr",
+          "team_target_share_to_te",
+          "team_target_share_to_rb",
+          "team_rush_share_to_rb",
           "preseason_sos_y",
           "adjusted_sos_y",
           "opp_def_strength_for_position",
           "matchup_advantage_score",
           "usage_trend",
           "target_share_trend",
-          "carries_per_game",
-          "rush_yds_per_game",
-          "yards_per_carry",
-          "carry_share_of_team",
-          "carries_last3",
           "depth_chart_position",
           "player_target_share_of_team",
           "weeks_into_season",
@@ -2016,64 +1891,64 @@
         ],
         "feature_importance": [
           {
-            "feature": "carries_last3",
-            "importance": 0.04538221284747124
-          },
-          {
-            "feature": "rush_yds_per_game",
-            "importance": 0.04212377220392227
+            "feature": "depth_chart_position",
+            "importance": 0.06031150370836258
           },
           {
             "feature": "weeks_since_injury",
-            "importance": 0.037417568266391754
+            "importance": 0.03406176343560219
           },
           {
             "feature": "oline_rank",
-            "importance": 0.02951066568493843
+            "importance": 0.02995741181075573
           },
           {
-            "feature": "depth_chart_position",
-            "importance": 0.027222389355301857
+            "feature": "bio_draft_number",
+            "importance": 0.027520129457116127
           },
           {
-            "feature": "carry_share_of_team",
-            "importance": 0.02429446205496788
-          },
-          {
-            "feature": "def_strength_vs_qb",
-            "importance": 0.021879253908991814
-          },
-          {
-            "feature": "rest_days",
-            "importance": 0.02088119462132454
-          },
-          {
-            "feature": "opp_def_strength_for_position",
-            "importance": 0.020869730040431023
-          },
-          {
-            "feature": "preseason_sos_y",
-            "importance": 0.020074807107448578
-          },
-          {
-            "feature": "implied_home_total",
-            "importance": 0.019105253741145134
-          },
-          {
-            "feature": "matchup_advantage_score",
-            "importance": 0.018870273604989052
-          },
-          {
-            "feature": "is_home",
-            "importance": 0.0185227133333683
-          },
-          {
-            "feature": "team_rush_share_to_rb_y",
-            "importance": 0.0184341911226511
+            "feature": "usage_trend",
+            "importance": 0.02677905187010765
           },
           {
             "feature": "bio_weight",
-            "importance": 0.018120327964425087
+            "importance": 0.025201428681612015
+          },
+          {
+            "feature": "player_target_share_of_team",
+            "importance": 0.02497667446732521
+          },
+          {
+            "feature": "weather_wind",
+            "importance": 0.02400141768157482
+          },
+          {
+            "feature": "def_strength_vs_qb",
+            "importance": 0.02322603017091751
+          },
+          {
+            "feature": "def_strength_vs_te",
+            "importance": 0.02142968773841858
+          },
+          {
+            "feature": "team_rush_share_to_rb",
+            "importance": 0.02131662331521511
+          },
+          {
+            "feature": "opp_def_strength_for_position",
+            "importance": 0.02120400033891201
+          },
+          {
+            "feature": "rest_days",
+            "importance": 0.020184265449643135
+          },
+          {
+            "feature": "matchup_advantage_score",
+            "importance": 0.019930459558963776
+          },
+          {
+            "feature": "bye_week_passed",
+            "importance": 0.019613930955529213
           }
         ],
         "scaler_mean": [
@@ -2119,13 +1994,8 @@
           0.4995158969884682,
           4.205701979470495,
           0.0023496116011874338,
-          1.3047371362564224,
-          0.8492537504558142,
-          7.841924857560996,
-          33.21285500454918,
-          4.2119178970900775,
-          0.2582682241195912,
-          7.897732709789939,
+          0.8508466095796374,
+          0.7315706950953376,
           0.6977774690929296,
           0.056430191883199234,
           9.193128675278974,
@@ -2178,13 +2048,8 @@
           0.03171664533413824,
           0.4473071052003988,
           0.43472958404909834,
-          4.400500265317505,
-          2.235005169648015,
-          5.435795261340748,
-          24.468663014858354,
-          0.874017305887839,
-          0.20301799880662671,
-          6.1645021059835745,
+          2.657362196450191,
+          1.9997681608904267,
           0.31197439521198306,
           0.05160411966545039,
           5.070569550895506,
@@ -2194,9 +2059,9 @@
           0.8533914580996739,
           2.012498733235083
         ],
-        "test_mae": 0.3275250880876984,
-        "test_rmse": 0.4986758788447942,
-        "test_r2": 0.13637878660957947,
+        "test_mae": 0.32098770041630925,
+        "test_rmse": 0.4876319804633506,
+        "test_r2": 0.12991167963664585,
         "model_path": "rushing_tds_rb_model.pkl"
       },
       "receptions": {
@@ -2236,21 +2101,16 @@
           "def_strength_vs_wr",
           "def_strength_vs_te",
           "def_strength_vs_qb",
-          "team_target_share_to_wr_y",
-          "team_target_share_to_te_y",
-          "team_target_share_to_rb_y",
-          "team_rush_share_to_rb_y",
+          "team_target_share_to_wr",
+          "team_target_share_to_te",
+          "team_target_share_to_rb",
+          "team_rush_share_to_rb",
           "preseason_sos_y",
           "adjusted_sos_y",
           "opp_def_strength_for_position",
           "matchup_advantage_score",
           "usage_trend",
           "target_share_trend",
-          "carries_per_game",
-          "rush_yds_per_game",
-          "yards_per_carry",
-          "carry_share_of_team",
-          "carries_last3",
           "depth_chart_position",
           "player_target_share_of_team",
           "weeks_into_season",
@@ -2263,63 +2123,63 @@
         "feature_importance": [
           {
             "feature": "player_target_share_of_team",
-            "importance": 0.11610793322324753
+            "importance": 0.10373154282569885
           },
           {
             "feature": "weeks_since_injury",
-            "importance": 0.08686655014753342
-          },
-          {
-            "feature": "team_target_share_to_rb_y",
-            "importance": 0.03401864320039749
-          },
-          {
-            "feature": "carry_share_of_team",
-            "importance": 0.03251313418149948
-          },
-          {
-            "feature": "prev_injuries_this_szn",
-            "importance": 0.025565357878804207
-          },
-          {
-            "feature": "bio_weight",
-            "importance": 0.02257668226957321
+            "importance": 0.07973667979240417
           },
           {
             "feature": "depth_chart_position",
-            "importance": 0.02128162793815136
+            "importance": 0.04458918049931526
           },
           {
-            "feature": "bio_age",
-            "importance": 0.02049846202135086
-          },
-          {
-            "feature": "carries_last3",
-            "importance": 0.01943366788327694
-          },
-          {
-            "feature": "target_share_trend",
-            "importance": 0.018947729840874672
-          },
-          {
-            "feature": "def_strength_vs_rb",
-            "importance": 0.018642472103238106
+            "feature": "team_target_share_to_rb",
+            "importance": 0.03997018188238144
           },
           {
             "feature": "weeks_into_season",
-            "importance": 0.017857229337096214
+            "importance": 0.032895419746637344
           },
           {
-            "feature": "preseason_sos_y",
-            "importance": 0.017498863860964775
+            "feature": "usage_trend",
+            "importance": 0.028985176235437393
+          },
+          {
+            "feature": "target_share_trend",
+            "importance": 0.026956256479024887
+          },
+          {
+            "feature": "prev_injuries_this_szn",
+            "importance": 0.02543632686138153
+          },
+          {
+            "feature": "bio_weight",
+            "importance": 0.022679032757878304
+          },
+          {
+            "feature": "bye_week_passed",
+            "importance": 0.02154550515115261
           },
           {
             "feature": "def_strength_vs_qb",
-            "importance": 0.016401955857872963
+            "importance": 0.019288139417767525
           },
           {
-            "feature": "div_game",
-            "importance": 0.016363026574254036
+            "feature": "def_strength_vs_wr",
+            "importance": 0.01907859742641449
+          },
+          {
+            "feature": "def_strength_vs_rb",
+            "importance": 0.017970480024814606
+          },
+          {
+            "feature": "games_played_this_szn",
+            "importance": 0.01767941191792488
+          },
+          {
+            "feature": "team_rush_share_to_rb",
+            "importance": 0.016653666272759438
           }
         ],
         "scaler_mean": [
@@ -2365,13 +2225,8 @@
           0.4995158969884682,
           4.205701979470495,
           0.0023496116011874338,
-          1.3047371362564224,
-          0.8492537504558142,
-          7.841924857560996,
-          33.21285500454918,
-          4.2119178970900775,
-          0.2582682241195912,
-          7.897732709789939,
+          0.8508466095796374,
+          0.7315706950953376,
           0.6977774690929296,
           0.056430191883199234,
           9.193128675278974,
@@ -2424,13 +2279,8 @@
           0.03171664533413824,
           0.4473071052003988,
           0.43472958404909834,
-          4.400500265317505,
-          2.235005169648015,
-          5.435795261340748,
-          24.468663014858354,
-          0.874017305887839,
-          0.20301799880662671,
-          6.1645021059835745,
+          2.657362196450191,
+          1.9997681608904267,
           0.31197439521198306,
           0.05160411966545039,
           5.070569550895506,
@@ -2440,9 +2290,9 @@
           0.8533914580996739,
           2.012498733235083
         ],
-        "test_mae": 1.0632737380011972,
-        "test_rmse": 1.4418357452346555,
-        "test_r2": 0.3220240366822128,
+        "test_mae": 1.02806696483251,
+        "test_rmse": 1.3858783330383468,
+        "test_r2": 0.3592494768257567,
         "model_path": "receptions_rb_model.pkl"
       },
       "receiving_yards": {
@@ -2482,21 +2332,16 @@
           "def_strength_vs_wr",
           "def_strength_vs_te",
           "def_strength_vs_qb",
-          "team_target_share_to_wr_y",
-          "team_target_share_to_te_y",
-          "team_target_share_to_rb_y",
-          "team_rush_share_to_rb_y",
+          "team_target_share_to_wr",
+          "team_target_share_to_te",
+          "team_target_share_to_rb",
+          "team_rush_share_to_rb",
           "preseason_sos_y",
           "adjusted_sos_y",
           "opp_def_strength_for_position",
           "matchup_advantage_score",
           "usage_trend",
           "target_share_trend",
-          "carries_per_game",
-          "rush_yds_per_game",
-          "yards_per_carry",
-          "carry_share_of_team",
-          "carries_last3",
           "depth_chart_position",
           "player_target_share_of_team",
           "weeks_into_season",
@@ -2509,63 +2354,63 @@
         "feature_importance": [
           {
             "feature": "player_target_share_of_team",
-            "importance": 0.08626141399145126
+            "importance": 0.07775632292032242
           },
           {
             "feature": "weeks_since_injury",
-            "importance": 0.0668099969625473
-          },
-          {
-            "feature": "team_target_share_to_rb_y",
-            "importance": 0.03476974368095398
-          },
-          {
-            "feature": "carry_share_of_team",
-            "importance": 0.02542842924594879
+            "importance": 0.06714989244937897
           },
           {
             "feature": "depth_chart_position",
-            "importance": 0.02319622039794922
+            "importance": 0.052581463009119034
           },
           {
-            "feature": "bye_week_passed",
-            "importance": 0.02316662110388279
+            "feature": "team_target_share_to_rb",
+            "importance": 0.03458518534898758
+          },
+          {
+            "feature": "weeks_into_season",
+            "importance": 0.03022562339901924
           },
           {
             "feature": "prev_injuries_this_szn",
-            "importance": 0.020758241415023804
+            "importance": 0.02666824869811535
           },
           {
-            "feature": "def_strength_vs_qb",
-            "importance": 0.020247595384716988
+            "feature": "target_share_trend",
+            "importance": 0.023102514445781708
           },
           {
-            "feature": "total_line",
-            "importance": 0.02023841068148613
-          },
-          {
-            "feature": "bio_rookie_year",
-            "importance": 0.019321084022521973
-          },
-          {
-            "feature": "bio_draft_number",
-            "importance": 0.01917131058871746
-          },
-          {
-            "feature": "bio_age",
-            "importance": 0.01881113462150097
-          },
-          {
-            "feature": "bio_entry_year",
-            "importance": 0.018769126385450363
-          },
-          {
-            "feature": "vegas_team_line",
-            "importance": 0.018244531005620956
+            "feature": "usage_trend",
+            "importance": 0.022415291517972946
           },
           {
             "feature": "bio_weight",
-            "importance": 0.018183527514338493
+            "importance": 0.022291500121355057
+          },
+          {
+            "feature": "def_strength_vs_qb",
+            "importance": 0.022205499932169914
+          },
+          {
+            "feature": "total_line",
+            "importance": 0.02056349627673626
+          },
+          {
+            "feature": "team_rush_share_to_rb",
+            "importance": 0.019770782440900803
+          },
+          {
+            "feature": "implied_home_total",
+            "importance": 0.019672444090247154
+          },
+          {
+            "feature": "bye_week_passed",
+            "importance": 0.018474742770195007
+          },
+          {
+            "feature": "under_odds",
+            "importance": 0.017870420590043068
           }
         ],
         "scaler_mean": [
@@ -2611,13 +2456,8 @@
           0.4995158969884682,
           4.205701979470495,
           0.0023496116011874338,
-          1.3047371362564224,
-          0.8492537504558142,
-          7.841924857560996,
-          33.21285500454918,
-          4.2119178970900775,
-          0.2582682241195912,
-          7.897732709789939,
+          0.8508466095796374,
+          0.7315706950953376,
           0.6977774690929296,
           0.056430191883199234,
           9.193128675278974,
@@ -2670,13 +2510,8 @@
           0.03171664533413824,
           0.4473071052003988,
           0.43472958404909834,
-          4.400500265317505,
-          2.235005169648015,
-          5.435795261340748,
-          24.468663014858354,
-          0.874017305887839,
-          0.20301799880662671,
-          6.1645021059835745,
+          2.657362196450191,
+          1.9997681608904267,
           0.31197439521198306,
           0.05160411966545039,
           5.070569550895506,
@@ -2686,9 +2521,9 @@
           0.8533914580996739,
           2.012498733235083
         ],
-        "test_mae": 10.116866916994582,
-        "test_rmse": 14.518021860396601,
-        "test_r2": 0.23057417005704728,
+        "test_mae": 9.570767940590832,
+        "test_rmse": 13.973895381465663,
+        "test_r2": 0.2529151678868191,
         "model_path": "receiving_yards_rb_model.pkl"
       },
       "receiving_tds": {
@@ -2728,21 +2563,16 @@
           "def_strength_vs_wr",
           "def_strength_vs_te",
           "def_strength_vs_qb",
-          "team_target_share_to_wr_y",
-          "team_target_share_to_te_y",
-          "team_target_share_to_rb_y",
-          "team_rush_share_to_rb_y",
+          "team_target_share_to_wr",
+          "team_target_share_to_te",
+          "team_target_share_to_rb",
+          "team_rush_share_to_rb",
           "preseason_sos_y",
           "adjusted_sos_y",
           "opp_def_strength_for_position",
           "matchup_advantage_score",
           "usage_trend",
           "target_share_trend",
-          "carries_per_game",
-          "rush_yds_per_game",
-          "yards_per_carry",
-          "carry_share_of_team",
-          "carries_last3",
           "depth_chart_position",
           "player_target_share_of_team",
           "weeks_into_season",
@@ -2754,64 +2584,64 @@
         ],
         "feature_importance": [
           {
-            "feature": "depth_chart_position",
-            "importance": 0.030054254457354546
+            "feature": "adjusted_sos_y",
+            "importance": 0.026244815438985825
+          },
+          {
+            "feature": "team_rush_share_to_rb",
+            "importance": 0.02446576952934265
           },
           {
             "feature": "adjusted_sos_x",
-            "importance": 0.023388510569930077
+            "importance": 0.02419954352080822
           },
           {
-            "feature": "bye_week_passed",
-            "importance": 0.023039711639285088
+            "feature": "opp_def_strength_for_position",
+            "importance": 0.023781761527061462
           },
           {
-            "feature": "rush_yds_per_game",
-            "importance": 0.021542459726333618
-          },
-          {
-            "feature": "player_target_share_of_team",
-            "importance": 0.021464142948389053
-          },
-          {
-            "feature": "def_strength_vs_te",
-            "importance": 0.020103024318814278
+            "feature": "weather_wind",
+            "importance": 0.023164574056863785
           },
           {
             "feature": "implied_home_total",
-            "importance": 0.019816400483250618
+            "importance": 0.02281634882092476
           },
           {
-            "feature": "yards_per_carry",
-            "importance": 0.01977752149105072
+            "feature": "team_target_share_to_rb",
+            "importance": 0.022472994402050972
           },
           {
-            "feature": "spread_line",
-            "importance": 0.019517244771122932
+            "feature": "player_target_share_of_team",
+            "importance": 0.022454654797911644
           },
           {
-            "feature": "oline_rank",
-            "importance": 0.019453085958957672
+            "feature": "usage_trend",
+            "importance": 0.022180750966072083
           },
           {
-            "feature": "weeks_since_injury",
-            "importance": 0.019402824342250824
+            "feature": "preseason_sos_x",
+            "importance": 0.022022997960448265
+          },
+          {
+            "feature": "implied_away_total",
+            "importance": 0.021840086206793785
+          },
+          {
+            "feature": "home_spread_odds",
+            "importance": 0.021611763164401054
+          },
+          {
+            "feature": "def_strength_vs_qb",
+            "importance": 0.021362941712141037
           },
           {
             "feature": "def_strength_vs_wr",
-            "importance": 0.019258517771959305
+            "importance": 0.02088778093457222
           },
           {
-            "feature": "carries_per_game",
-            "importance": 0.019212814047932625
-          },
-          {
-            "feature": "carries_last3",
-            "importance": 0.01913529448211193
-          },
-          {
-            "feature": "team_rush_share_to_rb_y",
-            "importance": 0.019107133150100708
+            "feature": "oline_rank",
+            "importance": 0.020219244062900543
           }
         ],
         "scaler_mean": [
@@ -2857,13 +2687,8 @@
           0.4995158969884682,
           4.205701979470495,
           0.0023496116011874338,
-          1.3047371362564224,
-          0.8492537504558142,
-          7.841924857560996,
-          33.21285500454918,
-          4.2119178970900775,
-          0.2582682241195912,
-          7.897732709789939,
+          0.8508466095796374,
+          0.7315706950953376,
           0.6977774690929296,
           0.056430191883199234,
           9.193128675278974,
@@ -2916,13 +2741,8 @@
           0.03171664533413824,
           0.4473071052003988,
           0.43472958404909834,
-          4.400500265317505,
-          2.235005169648015,
-          5.435795261340748,
-          24.468663014858354,
-          0.874017305887839,
-          0.20301799880662671,
-          6.1645021059835745,
+          2.657362196450191,
+          1.9997681608904267,
           0.31197439521198306,
           0.05160411966545039,
           5.070569550895506,
@@ -2932,9 +2752,9 @@
           0.8533914580996739,
           2.012498733235083
         ],
-        "test_mae": 0.12333306308888996,
-        "test_rmse": 0.26365588021540964,
-        "test_r2": 0.020142382958167837,
+        "test_mae": 0.11720633329304289,
+        "test_rmse": 0.2563942363933826,
+        "test_r2": 0.015437542921614478,
         "model_path": "receiving_tds_rb_model.pkl"
       }
     },
@@ -2976,20 +2796,16 @@
           "def_strength_vs_wr",
           "def_strength_vs_te",
           "def_strength_vs_qb",
-          "team_target_share_to_wr_y",
-          "team_target_share_to_te_y",
-          "team_target_share_to_rb_y",
-          "team_rush_share_to_rb_y",
+          "team_target_share_to_wr",
+          "team_target_share_to_te",
+          "team_target_share_to_rb",
+          "team_rush_share_to_rb",
           "preseason_sos_y",
           "adjusted_sos_y",
           "opp_def_strength_for_position",
           "matchup_advantage_score",
           "usage_trend",
           "target_share_trend",
-          "carries_per_game",
-          "rush_yds_per_game",
-          "carry_share_of_team",
-          "carries_last3",
           "depth_chart_position",
           "player_target_share_of_team",
           "weeks_into_season",
@@ -3001,64 +2817,64 @@
         ],
         "feature_importance": [
           {
+            "feature": "depth_chart_position",
+            "importance": 0.16098904609680176
+          },
+          {
             "feature": "player_target_share_of_team",
-            "importance": 0.1793455332517624
+            "importance": 0.14682167768478394
           },
           {
             "feature": "weeks_since_injury",
-            "importance": 0.09089638292789459
-          },
-          {
-            "feature": "depth_chart_position",
-            "importance": 0.08954014629125595
-          },
-          {
-            "feature": "prev_injuries_this_szn",
-            "importance": 0.04042084515094757
-          },
-          {
-            "feature": "target_share_trend",
-            "importance": 0.021867481991648674
-          },
-          {
-            "feature": "total_line",
-            "importance": 0.019076792523264885
-          },
-          {
-            "feature": "team_target_share_to_wr_y",
-            "importance": 0.018376948311924934
-          },
-          {
-            "feature": "team_rush_share_to_rb_y",
-            "importance": 0.017549483105540276
-          },
-          {
-            "feature": "preseason_sos_y",
-            "importance": 0.016536127775907516
+            "importance": 0.08889023214578629
           },
           {
             "feature": "usage_trend",
-            "importance": 0.016477547585964203
+            "importance": 0.030584488064050674
           },
           {
-            "feature": "bio_draft_number",
-            "importance": 0.015821484848856926
+            "feature": "target_share_trend",
+            "importance": 0.029786931350827217
           },
           {
             "feature": "weeks_into_season",
-            "importance": 0.014891497790813446
+            "importance": 0.0242832750082016
           },
           {
-            "feature": "team_target_share_to_rb_y",
-            "importance": 0.014050493948161602
+            "feature": "prev_injuries_this_szn",
+            "importance": 0.022304778918623924
+          },
+          {
+            "feature": "bye_week_passed",
+            "importance": 0.018284492194652557
+          },
+          {
+            "feature": "team_target_share_to_wr",
+            "importance": 0.018127307295799255
+          },
+          {
+            "feature": "team_rush_share_to_rb",
+            "importance": 0.016977528110146523
+          },
+          {
+            "feature": "total_line",
+            "importance": 0.016815919429063797
           },
           {
             "feature": "def_strength_vs_qb",
-            "importance": 0.01397943776100874
+            "importance": 0.016536613926291466
           },
           {
-            "feature": "carry_share_of_team",
-            "importance": 0.013473513536155224
+            "feature": "games_played_this_szn",
+            "importance": 0.015642307698726654
+          },
+          {
+            "feature": "bio_draft_number",
+            "importance": 0.01525316946208477
+          },
+          {
+            "feature": "bio_entry_year",
+            "importance": 0.014574168249964714
           }
         ],
         "scaler_mean": [
@@ -3104,12 +2920,8 @@
           0.5002763938301322,
           7.856315586409612,
           -0.002554319495982761,
-          1.2097509632656893,
-          0.7858412299986921,
-          0.15668265092659475,
-          0.9633292369014528,
-          0.00505594695584945,
-          0.1577223169534439,
+          0.8377587777556795,
+          0.6878955986609727,
           0.7794047434506277,
           0.12204591339361023,
           9.189521004495427,
@@ -3162,12 +2974,8 @@
           0.03166241534552144,
           0.7841640461861077,
           0.7605070920125053,
-          3.695330096224439,
-          1.1025637898710208,
-          0.36161268443159467,
-          2.502361030709657,
-          0.011941962339166204,
-          0.43584830756671417,
+          2.357929674102095,
+          1.1388818617518133,
           0.28114899067046734,
           0.08837845824689541,
           5.06125080842285,
@@ -3177,9 +2985,9 @@
           0.9400129175460675,
           2.022360600864805
         ],
-        "test_mae": 1.3607292800160578,
-        "test_rmse": 1.8489968121760725,
-        "test_r2": 0.39582743811753096,
+        "test_mae": 1.3334792146182821,
+        "test_rmse": 1.8024690702663737,
+        "test_r2": 0.42237062923556357,
         "model_path": "receptions_wr_model.pkl"
       },
       "receiving_yards": {
@@ -3219,20 +3027,16 @@
           "def_strength_vs_wr",
           "def_strength_vs_te",
           "def_strength_vs_qb",
-          "team_target_share_to_wr_y",
-          "team_target_share_to_te_y",
-          "team_target_share_to_rb_y",
-          "team_rush_share_to_rb_y",
+          "team_target_share_to_wr",
+          "team_target_share_to_te",
+          "team_target_share_to_rb",
+          "team_rush_share_to_rb",
           "preseason_sos_y",
           "adjusted_sos_y",
           "opp_def_strength_for_position",
           "matchup_advantage_score",
           "usage_trend",
           "target_share_trend",
-          "carries_per_game",
-          "rush_yds_per_game",
-          "carry_share_of_team",
-          "carries_last3",
           "depth_chart_position",
           "player_target_share_of_team",
           "weeks_into_season",
@@ -3244,64 +3048,64 @@
         ],
         "feature_importance": [
           {
-            "feature": "player_target_share_of_team",
-            "importance": 0.15431293845176697
+            "feature": "depth_chart_position",
+            "importance": 0.1247204840183258
           },
           {
-            "feature": "depth_chart_position",
-            "importance": 0.10831817984580994
+            "feature": "player_target_share_of_team",
+            "importance": 0.12323403358459473
           },
           {
             "feature": "weeks_since_injury",
-            "importance": 0.079799123108387
-          },
-          {
-            "feature": "prev_injuries_this_szn",
-            "importance": 0.03851107135415077
-          },
-          {
-            "feature": "matchup_advantage_score",
-            "importance": 0.020423490554094315
-          },
-          {
-            "feature": "team_rush_share_to_rb_y",
-            "importance": 0.01911984756588936
+            "importance": 0.07625972479581833
           },
           {
             "feature": "target_share_trend",
-            "importance": 0.018164299428462982
+            "importance": 0.031049687415361404
           },
           {
-            "feature": "preseason_sos_y",
-            "importance": 0.01766650378704071
+            "feature": "usage_trend",
+            "importance": 0.0307359267026186
           },
           {
-            "feature": "bio_draft_number",
-            "importance": 0.01766282692551613
+            "feature": "prev_injuries_this_szn",
+            "importance": 0.025156045332551003
+          },
+          {
+            "feature": "weeks_into_season",
+            "importance": 0.019917931407690048
           },
           {
             "feature": "bio_height",
-            "importance": 0.017567303031682968
+            "importance": 0.019479133188724518
           },
           {
-            "feature": "total_line",
-            "importance": 0.01733631268143654
-          },
-          {
-            "feature": "weather_wind",
-            "importance": 0.017289435490965843
+            "feature": "matchup_advantage_score",
+            "importance": 0.019289089366793633
           },
           {
             "feature": "opp_def_strength_for_position",
-            "importance": 0.01608268916606903
+            "importance": 0.019108489155769348
           },
           {
-            "feature": "team_target_share_to_wr_y",
-            "importance": 0.015712328255176544
+            "feature": "team_rush_share_to_rb",
+            "importance": 0.01885867305099964
           },
           {
-            "feature": "team_target_share_to_te_y",
-            "importance": 0.014889813028275967
+            "feature": "total_line",
+            "importance": 0.018674204126000404
+          },
+          {
+            "feature": "bio_draft_number",
+            "importance": 0.01775161549448967
+          },
+          {
+            "feature": "team_target_share_to_wr",
+            "importance": 0.01752452179789543
+          },
+          {
+            "feature": "bio_age",
+            "importance": 0.01741357147693634
           }
         ],
         "scaler_mean": [
@@ -3347,12 +3151,8 @@
           0.5002763938301322,
           7.856315586409612,
           -0.002554319495982761,
-          1.2097509632656893,
-          0.7858412299986921,
-          0.15668265092659475,
-          0.9633292369014528,
-          0.00505594695584945,
-          0.1577223169534439,
+          0.8377587777556795,
+          0.6878955986609727,
           0.7794047434506277,
           0.12204591339361023,
           9.189521004495427,
@@ -3405,12 +3205,8 @@
           0.03166241534552144,
           0.7841640461861077,
           0.7605070920125053,
-          3.695330096224439,
-          1.1025637898710208,
-          0.36161268443159467,
-          2.502361030709657,
-          0.011941962339166204,
-          0.43584830756671417,
+          2.357929674102095,
+          1.1388818617518133,
           0.28114899067046734,
           0.08837845824689541,
           5.06125080842285,
@@ -3420,9 +3216,9 @@
           0.9400129175460675,
           2.022360600864805
         ],
-        "test_mae": 19.99153498762225,
-        "test_rmse": 28.12322043853749,
-        "test_r2": 0.32601380230322474,
+        "test_mae": 19.659523699841085,
+        "test_rmse": 27.070080031922974,
+        "test_r2": 0.358666770919399,
         "model_path": "receiving_yards_wr_model.pkl"
       },
       "receiving_tds": {
@@ -3462,20 +3258,16 @@
           "def_strength_vs_wr",
           "def_strength_vs_te",
           "def_strength_vs_qb",
-          "team_target_share_to_wr_y",
-          "team_target_share_to_te_y",
-          "team_target_share_to_rb_y",
-          "team_rush_share_to_rb_y",
+          "team_target_share_to_wr",
+          "team_target_share_to_te",
+          "team_target_share_to_rb",
+          "team_rush_share_to_rb",
           "preseason_sos_y",
           "adjusted_sos_y",
           "opp_def_strength_for_position",
           "matchup_advantage_score",
           "usage_trend",
           "target_share_trend",
-          "carries_per_game",
-          "rush_yds_per_game",
-          "carry_share_of_team",
-          "carries_last3",
           "depth_chart_position",
           "player_target_share_of_team",
           "weeks_into_season",
@@ -3487,64 +3279,64 @@
         ],
         "feature_importance": [
           {
+            "feature": "depth_chart_position",
+            "importance": 0.0693005919456482
+          },
+          {
             "feature": "player_target_share_of_team",
-            "importance": 0.05204438045620918
+            "importance": 0.042599376291036606
           },
           {
             "feature": "weeks_since_injury",
-            "importance": 0.039926543831825256
+            "importance": 0.036312974989414215
           },
           {
-            "feature": "depth_chart_position",
-            "importance": 0.034888409078121185
+            "feature": "weeks_into_season",
+            "importance": 0.023008637130260468
           },
           {
-            "feature": "adjusted_sos_y",
-            "importance": 0.022827526554465294
+            "feature": "prev_injuries_this_szn",
+            "importance": 0.022842183709144592
           },
           {
-            "feature": "adjusted_sos_x",
-            "importance": 0.022700747475028038
+            "feature": "rest_days",
+            "importance": 0.022761527448892593
           },
           {
             "feature": "oline_rank",
-            "importance": 0.022443989291787148
-          },
-          {
-            "feature": "preseason_sos_y",
-            "importance": 0.020945999771356583
-          },
-          {
-            "feature": "def_strength_vs_qb",
-            "importance": 0.020608721300959587
-          },
-          {
-            "feature": "opp_def_strength_for_position",
-            "importance": 0.02019985392689705
+            "importance": 0.02193641848862171
           },
           {
             "feature": "def_strength_vs_te",
-            "importance": 0.020020367577672005
+            "importance": 0.021197419613599777
           },
           {
-            "feature": "bio_weight",
-            "importance": 0.019963489845395088
-          },
-          {
-            "feature": "vegas_team_line",
-            "importance": 0.019733760505914688
-          },
-          {
-            "feature": "team_target_share_to_wr_y",
-            "importance": 0.019488468766212463
+            "feature": "adjusted_sos_x",
+            "importance": 0.021166658028960228
           },
           {
             "feature": "matchup_advantage_score",
-            "importance": 0.01939457282423973
+            "importance": 0.021161215379834175
+          },
+          {
+            "feature": "bye_week_passed",
+            "importance": 0.020547665655612946
+          },
+          {
+            "feature": "target_share_trend",
+            "importance": 0.02035788632929325
           },
           {
             "feature": "div_game",
-            "importance": 0.01914651319384575
+            "importance": 0.02016982063651085
+          },
+          {
+            "feature": "adjusted_sos_y",
+            "importance": 0.01977602206170559
+          },
+          {
+            "feature": "implied_away_total",
+            "importance": 0.019685203209519386
           }
         ],
         "scaler_mean": [
@@ -3590,12 +3382,8 @@
           0.5002763938301322,
           7.856315586409612,
           -0.002554319495982761,
-          1.2097509632656893,
-          0.7858412299986921,
-          0.15668265092659475,
-          0.9633292369014528,
-          0.00505594695584945,
-          0.1577223169534439,
+          0.8377587777556795,
+          0.6878955986609727,
           0.7794047434506277,
           0.12204591339361023,
           9.189521004495427,
@@ -3648,12 +3436,8 @@
           0.03166241534552144,
           0.7841640461861077,
           0.7605070920125053,
-          3.695330096224439,
-          1.1025637898710208,
-          0.36161268443159467,
-          2.502361030709657,
-          0.011941962339166204,
-          0.43584830756671417,
+          2.357929674102095,
+          1.1388818617518133,
           0.28114899067046734,
           0.08837845824689541,
           5.06125080842285,
@@ -3663,9 +3447,9 @@
           0.9400129175460675,
           2.022360600864805
         ],
-        "test_mae": 0.28636922644761453,
-        "test_rmse": 0.43636956124066406,
-        "test_r2": 0.05354208197717936,
+        "test_mae": 0.26762252928384384,
+        "test_rmse": 0.41630144705306854,
+        "test_r2": 0.07255390337292811,
         "model_path": "receiving_tds_wr_model.pkl"
       }
     },
@@ -3707,20 +3491,16 @@
           "def_strength_vs_wr",
           "def_strength_vs_te",
           "def_strength_vs_qb",
-          "team_target_share_to_wr_y",
-          "team_target_share_to_te_y",
-          "team_target_share_to_rb_y",
-          "team_rush_share_to_rb_y",
+          "team_target_share_to_wr",
+          "team_target_share_to_te",
+          "team_target_share_to_rb",
+          "team_rush_share_to_rb",
           "preseason_sos_y",
           "adjusted_sos_y",
           "opp_def_strength_for_position",
           "matchup_advantage_score",
           "usage_trend",
           "target_share_trend",
-          "carries_per_game",
-          "rush_yds_per_game",
-          "carry_share_of_team",
-          "carries_last3",
           "depth_chart_position",
           "player_target_share_of_team",
           "weeks_into_season",
@@ -3732,64 +3512,64 @@
         ],
         "feature_importance": [
           {
+            "feature": "depth_chart_position",
+            "importance": 0.13076716661453247
+          },
+          {
             "feature": "player_target_share_of_team",
-            "importance": 0.1309831440448761
+            "importance": 0.1092154011130333
           },
           {
             "feature": "weeks_since_injury",
-            "importance": 0.08640485256910324
+            "importance": 0.08346734195947647
           },
           {
-            "feature": "depth_chart_position",
-            "importance": 0.08287391811609268
-          },
-          {
-            "feature": "team_target_share_to_te_y",
-            "importance": 0.036056358367204666
-          },
-          {
-            "feature": "prev_injuries_this_szn",
-            "importance": 0.026286320760846138
-          },
-          {
-            "feature": "bio_draft_number",
-            "importance": 0.02204378880560398
-          },
-          {
-            "feature": "team_rush_share_to_rb_y",
-            "importance": 0.021463438868522644
-          },
-          {
-            "feature": "bio_rookie_year",
-            "importance": 0.020589731633663177
-          },
-          {
-            "feature": "team_target_share_to_wr_y",
-            "importance": 0.019308308139443398
-          },
-          {
-            "feature": "rush_yds_per_game",
-            "importance": 0.017033789306879044
+            "feature": "team_target_share_to_te",
+            "importance": 0.039855826646089554
           },
           {
             "feature": "target_share_trend",
-            "importance": 0.01618170365691185
+            "importance": 0.03062959760427475
           },
           {
-            "feature": "team_target_share_to_rb_y",
-            "importance": 0.015799090266227722
+            "feature": "prev_injuries_this_szn",
+            "importance": 0.027348168194293976
           },
           {
-            "feature": "bio_age",
-            "importance": 0.015643294900655746
+            "feature": "usage_trend",
+            "importance": 0.024539876729249954
+          },
+          {
+            "feature": "bio_draft_number",
+            "importance": 0.019815552979707718
+          },
+          {
+            "feature": "weeks_into_season",
+            "importance": 0.018691224977374077
+          },
+          {
+            "feature": "team_target_share_to_wr",
+            "importance": 0.016692720353603363
+          },
+          {
+            "feature": "games_played_this_szn",
+            "importance": 0.016666647046804428
+          },
+          {
+            "feature": "team_rush_share_to_rb",
+            "importance": 0.01633722335100174
+          },
+          {
+            "feature": "bio_rookie_year",
+            "importance": 0.015711434185504913
           },
           {
             "feature": "bio_weight",
-            "importance": 0.014838709495961666
+            "importance": 0.015635577961802483
           },
           {
-            "feature": "adjusted_sos_x",
-            "importance": 0.014815956354141235
+            "feature": "def_strength_vs_te",
+            "importance": 0.015304523520171642
           }
         ],
         "scaler_mean": [
@@ -3835,12 +3615,8 @@
           0.4997590998544172,
           7.260258914960849,
           0.002125631747132909,
-          1.2196400394662716,
-          0.8163966978719291,
-          0.02288119106886065,
-          0.096066663152782,
-          0.0006851577906992681,
-          0.02334933727276458,
+          0.7896428954188962,
+          0.6585679855442814,
           0.6949279822725594,
           0.08108313727474362,
           9.186692108826788,
@@ -3893,12 +3669,8 @@
           0.03182082582081602,
           0.8871015518502858,
           0.8710297801010889,
-          3.0772970072620054,
-          1.2136455841593379,
-          0.17161683120823884,
-          1.1859913770456314,
-          0.00571360139785281,
-          0.21334814035143407,
+          1.894564989997073,
+          1.1969510586080372,
           0.31438902188384704,
           0.0689029576340158,
           5.056475115190517,
@@ -3908,9 +3680,9 @@
           0.8251039118872457,
           2.029908333783665
         ],
-        "test_mae": 1.2030549932208727,
-        "test_rmse": 1.6795962295323679,
-        "test_r2": 0.38478284428173337,
+        "test_mae": 1.1969027668552923,
+        "test_rmse": 1.6684427302774931,
+        "test_r2": 0.3929265168016245,
         "model_path": "receptions_te_model.pkl"
       },
       "receiving_yards": {
@@ -3950,20 +3722,16 @@
           "def_strength_vs_wr",
           "def_strength_vs_te",
           "def_strength_vs_qb",
-          "team_target_share_to_wr_y",
-          "team_target_share_to_te_y",
-          "team_target_share_to_rb_y",
-          "team_rush_share_to_rb_y",
+          "team_target_share_to_wr",
+          "team_target_share_to_te",
+          "team_target_share_to_rb",
+          "team_rush_share_to_rb",
           "preseason_sos_y",
           "adjusted_sos_y",
           "opp_def_strength_for_position",
           "matchup_advantage_score",
           "usage_trend",
           "target_share_trend",
-          "carries_per_game",
-          "rush_yds_per_game",
-          "carry_share_of_team",
-          "carries_last3",
           "depth_chart_position",
           "player_target_share_of_team",
           "weeks_into_season",
@@ -3975,64 +3743,64 @@
         ],
         "feature_importance": [
           {
-            "feature": "player_target_share_of_team",
-            "importance": 0.10642893612384796
+            "feature": "depth_chart_position",
+            "importance": 0.10078156739473343
           },
           {
-            "feature": "depth_chart_position",
-            "importance": 0.07748296856880188
+            "feature": "player_target_share_of_team",
+            "importance": 0.09717593342065811
           },
           {
             "feature": "weeks_since_injury",
-            "importance": 0.07170675694942474
+            "importance": 0.06855656206607819
           },
           {
-            "feature": "team_target_share_to_te_y",
-            "importance": 0.03693137317895889
+            "feature": "team_target_share_to_te",
+            "importance": 0.04565366730093956
           },
           {
-            "feature": "prev_injuries_this_szn",
-            "importance": 0.025596946477890015
+            "feature": "target_share_trend",
+            "importance": 0.02682369574904442
           },
           {
-            "feature": "opp_def_strength_for_position",
-            "importance": 0.02429506741464138
-          },
-          {
-            "feature": "team_target_share_to_wr_y",
-            "importance": 0.023274613544344902
-          },
-          {
-            "feature": "matchup_advantage_score",
-            "importance": 0.021197456866502762
-          },
-          {
-            "feature": "adjusted_sos_y",
-            "importance": 0.019547414034605026
-          },
-          {
-            "feature": "total_line",
-            "importance": 0.0194510780274868
+            "feature": "team_target_share_to_wr",
+            "importance": 0.02386622317135334
           },
           {
             "feature": "usage_trend",
-            "importance": 0.017500214278697968
+            "importance": 0.022535916417837143
+          },
+          {
+            "feature": "opp_def_strength_for_position",
+            "importance": 0.02220500074326992
+          },
+          {
+            "feature": "matchup_advantage_score",
+            "importance": 0.021441977471113205
+          },
+          {
+            "feature": "prev_injuries_this_szn",
+            "importance": 0.02056959643959999
           },
           {
             "feature": "bio_draft_number",
-            "importance": 0.01733984611928463
+            "importance": 0.019588328897953033
           },
           {
-            "feature": "preseason_sos_y",
-            "importance": 0.016609802842140198
+            "feature": "weather_wind",
+            "importance": 0.01900465041399002
           },
           {
-            "feature": "team_target_share_to_rb_y",
-            "importance": 0.01657375879585743
+            "feature": "team_target_share_to_rb",
+            "importance": 0.018588950857520103
           },
           {
-            "feature": "adjusted_sos_x",
-            "importance": 0.016492923721671104
+            "feature": "total_line",
+            "importance": 0.01722443290054798
+          },
+          {
+            "feature": "adjusted_sos_y",
+            "importance": 0.016710937023162842
           }
         ],
         "scaler_mean": [
@@ -4078,12 +3846,8 @@
           0.4997590998544172,
           7.260258914960849,
           0.002125631747132909,
-          1.2196400394662716,
-          0.8163966978719291,
-          0.02288119106886065,
-          0.096066663152782,
-          0.0006851577906992681,
-          0.02334933727276458,
+          0.7896428954188962,
+          0.6585679855442814,
           0.6949279822725594,
           0.08108313727474362,
           9.186692108826788,
@@ -4136,12 +3900,8 @@
           0.03182082582081602,
           0.8871015518502858,
           0.8710297801010889,
-          3.0772970072620054,
-          1.2136455841593379,
-          0.17161683120823884,
-          1.1859913770456314,
-          0.00571360139785281,
-          0.21334814035143407,
+          1.894564989997073,
+          1.1969510586080372,
           0.31438902188384704,
           0.0689029576340158,
           5.056475115190517,
@@ -4151,9 +3911,9 @@
           0.8251039118872457,
           2.029908333783665
         ],
-        "test_mae": 15.066629280351119,
-        "test_rmse": 20.957470910541957,
-        "test_r2": 0.31082552392306895,
+        "test_mae": 14.829440095189826,
+        "test_rmse": 21.016634709594975,
+        "test_r2": 0.3070131727062745,
         "model_path": "receiving_yards_te_model.pkl"
       },
       "receiving_tds": {
@@ -4193,20 +3953,16 @@
           "def_strength_vs_wr",
           "def_strength_vs_te",
           "def_strength_vs_qb",
-          "team_target_share_to_wr_y",
-          "team_target_share_to_te_y",
-          "team_target_share_to_rb_y",
-          "team_rush_share_to_rb_y",
+          "team_target_share_to_wr",
+          "team_target_share_to_te",
+          "team_target_share_to_rb",
+          "team_rush_share_to_rb",
           "preseason_sos_y",
           "adjusted_sos_y",
           "opp_def_strength_for_position",
           "matchup_advantage_score",
           "usage_trend",
           "target_share_trend",
-          "carries_per_game",
-          "rush_yds_per_game",
-          "carry_share_of_team",
-          "carries_last3",
           "depth_chart_position",
           "player_target_share_of_team",
           "weeks_into_season",
@@ -4218,64 +3974,64 @@
         ],
         "feature_importance": [
           {
-            "feature": "player_target_share_of_team",
-            "importance": 0.034922853112220764
-          },
-          {
             "feature": "depth_chart_position",
-            "importance": 0.0321795828640461
+            "importance": 0.037776779383420944
           },
           {
-            "feature": "div_game",
-            "importance": 0.027090851217508316
+            "feature": "player_target_share_of_team",
+            "importance": 0.03221168741583824
           },
           {
-            "feature": "vegas_team_line",
-            "importance": 0.024859581142663956
+            "feature": "team_target_share_to_te",
+            "importance": 0.02531307190656662
           },
           {
-            "feature": "team_target_share_to_te_y",
-            "importance": 0.023612648248672485
+            "feature": "team_target_share_to_rb",
+            "importance": 0.024777648970484734
           },
           {
             "feature": "weeks_since_injury",
-            "importance": 0.022788533940911293
+            "importance": 0.024753093719482422
           },
           {
-            "feature": "team_rush_share_to_rb_y",
-            "importance": 0.020995380356907845
+            "feature": "vegas_team_line",
+            "importance": 0.023724157363176346
+          },
+          {
+            "feature": "weeks_into_season",
+            "importance": 0.023592034354805946
           },
           {
             "feature": "adjusted_sos_x",
-            "importance": 0.020533768460154533
+            "importance": 0.02213536575436592
           },
           {
-            "feature": "carries_last3",
-            "importance": 0.0204374510794878
+            "feature": "bye_week_passed",
+            "importance": 0.021796397864818573
           },
           {
-            "feature": "matchup_advantage_score",
-            "importance": 0.020427383482456207
+            "feature": "def_strength_vs_wr",
+            "importance": 0.021440526470541954
           },
           {
-            "feature": "def_strength_vs_qb",
-            "importance": 0.018842646852135658
+            "feature": "team_rush_share_to_rb",
+            "importance": 0.021303700283169746
           },
           {
-            "feature": "sched_temp",
-            "importance": 0.01864822767674923
+            "feature": "adjusted_sos_y",
+            "importance": 0.020866813138127327
           },
           {
-            "feature": "bio_draft_number",
-            "importance": 0.018631523475050926
+            "feature": "implied_home_total",
+            "importance": 0.02072134241461754
           },
           {
             "feature": "def_strength_vs_te",
-            "importance": 0.01850074902176857
+            "importance": 0.020098550245165825
           },
           {
-            "feature": "bio_age",
-            "importance": 0.01845700666308403
+            "feature": "opp_def_strength_for_position",
+            "importance": 0.020084014162421227
           }
         ],
         "scaler_mean": [
@@ -4321,12 +4077,8 @@
           0.4997590998544172,
           7.260258914960849,
           0.002125631747132909,
-          1.2196400394662716,
-          0.8163966978719291,
-          0.02288119106886065,
-          0.096066663152782,
-          0.0006851577906992681,
-          0.02334933727276458,
+          0.7896428954188962,
+          0.6585679855442814,
           0.6949279822725594,
           0.08108313727474362,
           9.186692108826788,
@@ -4379,12 +4131,8 @@
           0.03182082582081602,
           0.8871015518502858,
           0.8710297801010889,
-          3.0772970072620054,
-          1.2136455841593379,
-          0.17161683120823884,
-          1.1859913770456314,
-          0.00571360139785281,
-          0.21334814035143407,
+          1.894564989997073,
+          1.1969510586080372,
           0.31438902188384704,
           0.0689029576340158,
           5.056475115190517,
@@ -4394,45 +4142,45 @@
           0.8251039118872457,
           2.029908333783665
         ],
-        "test_mae": 0.2781342946807765,
-        "test_rmse": 0.4238066962845181,
-        "test_r2": 0.051655775389686354,
+        "test_mae": 0.2730185093121421,
+        "test_rmse": 0.4295323317482157,
+        "test_r2": 0.025858390821324462,
         "model_path": "receiving_tds_te_model.pkl"
       }
     }
   },
   "ppr_reconstruction": {
     "overall": {
-      "mae": 4.383102394212674,
-      "rmse": 6.036737281732099,
-      "r2": 0.4116995527783347
+      "mae": 4.330079095744768,
+      "rmse": 5.940852465758129,
+      "r2": 0.4239951094987746
     },
     "by_position": {
       "QB": {
-        "mae": 6.133469382626995,
-        "rmse": 7.647119564961309,
-        "r2": 0.3966663445649413
+        "mae": 6.195893137049509,
+        "rmse": 7.6924276671149885,
+        "r2": 0.38916037276228177
       },
       "RB": {
-        "mae": 4.446209866588066,
-        "rmse": 6.027449825023405,
-        "r2": 0.45525880930535345
+        "mae": 4.413732242015843,
+        "rmse": 5.974588700083442,
+        "r2": 0.4573686724317775
       },
       "WR": {
-        "mae": 4.249763978262888,
-        "rmse": 5.962479538303303,
-        "r2": 0.3355384005323421
+        "mae": 4.142476719279765,
+        "rmse": 5.732369955942111,
+        "r2": 0.3728804414414929
       },
       "TE": {
-        "mae": 3.5149117905191916,
-        "rmse": 5.012020357176754,
-        "r2": 0.3283349282105138
+        "mae": 3.497736539425521,
+        "rmse": 5.058088215909474,
+        "r2": 0.3160150385255972
       }
     },
     "formula_floor_overall": {
-      "mae": 0.18079265345577586,
-      "rmse": 0.7924193355891177,
-      "r2": 0.9898631095028437
+      "mae": 0.17113962725328452,
+      "rmse": 0.7695969717525172,
+      "r2": 0.9903338097994276
     }
   },
   "trained_on_seasons": [
