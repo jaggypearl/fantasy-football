@@ -42,6 +42,7 @@ BOX_SCORE_PATH = RAW_DIR / "box_scores" / f"box_scores_{TARGET_SEASON}.csv"
 PRIOR_BOX_SCORE_PATH = RAW_DIR / "box_scores" / f"box_scores_{CONTEXT_SEASON}.csv"
 INJURY_PATH = RAW_DIR / "injury_reports" / f"injury_reports_{TARGET_SEASON}.csv"
 OLINE_PATH = RAW_DIR / "oline_rankings_weekly" / f"oline_rankings_weekly_{TARGET_SEASON}.csv"
+PRIOR_OLINE_PATH = RAW_DIR / "oline_rankings_weekly" / f"oline_rankings_weekly_{CONTEXT_SEASON}.csv"
 TEAM_AGGS_PATH = PROCESSED_DIR / "team_aggs.parquet"
 TRAINING_PATH = PROCESSED_DIR / "final_training_data.parquet"
 
@@ -54,6 +55,26 @@ NO_INJURY_WEEKS = 99.0
 
 # Statuses Layer 1 treats as a did-not-play when it builds dnp_flag.
 DNP_STATUSES = ("Out", "IR")
+
+# In-season form is shrunk toward the prior-season baseline with weight
+# n / (n + SHRINKAGE_GAMES), n being games played this season: 1 game counts a
+# third, 2 games half, 6 games three quarters. 2 is the constant that best
+# predicted rest-of-season target share from the first 1-6 games of 2016-2025,
+# at every position, beating both the raw in-season share and the prior season.
+SHRINKAGE_GAMES = 2.0
+
+# The trend ratios divide an n-game sample by last season's same n-game span,
+# so both sides are noisy; they shrink toward 1.0 with 6 in place of 2 (2 games
+# count a quarter). 6 was the best fit for rest-of-season usage and share
+# change on the same 2016-2025 games.
+TREND_SHRINKAGE_GAMES = 6.0
+
+# Layer 3 clips the trend ratios to this floor.
+TREND_FLOOR = 0.1
+
+# The RB stats whose models read target share as a proxy for role. For these,
+# receiving work may lift the projection but a thin share may not sink it.
+RB_RUSHING_STATS = ("carries", "rushing_yards", "rushing_tds")
 
 TEAM_ALIASES = {"LAR": "LA", "STL": "LA", "OAK": "LV", "SD": "LAC", "WSH": "WAS",
                 "ARZ": "ARI", "BLT": "BAL", "CLV": "CLE", "HST": "HOU", "SL": "LA"}
@@ -118,6 +139,28 @@ def safe_ratio(numerator: float, denominator: float) -> float | None:
         return None
     value = numerator / denominator
     return float(value) if np.isfinite(value) else None
+
+
+def in_season_weight(games: int | None, shrinkage: float = SHRINKAGE_GAMES) -> float:
+    """How far this season's sample may pull a feature off its prior-season value."""
+    if not games:
+        return 0.0
+    return games / (games + shrinkage)
+
+
+def blend(current: float | None, prior: float | None, weight: float) -> float | None:
+    if current is None:
+        return prior
+    if prior is None:
+        return current
+    return weight * current + (1.0 - weight) * prior
+
+
+def shrink_ratio(ratio: float | None, weight: float) -> float | None:
+    """Pull a this-season-over-last ratio toward 1.0, in log space so 0.5 and 2.0 are symmetric."""
+    if ratio is None:
+        return None
+    return float(np.exp(weight * np.log(max(ratio, TREND_FLOOR))))
 
 
 # ---------------------------------------------------------------------------
@@ -215,7 +258,8 @@ class SeasonForm:
         self.injuries = injuries
 
         self.depth_chart, self.depth_week = self._latest_depth_chart()
-        self.oline, self.oline_week = self._latest_oline()
+        self.oline = self._oline_ranks(OLINE_PATH, lambda week: week < target_week)
+        self.prior_oline = self._oline_ranks(PRIOR_OLINE_PATH, lambda week: week.notna())
         self.bye_weeks = self._bye_weeks(schedule)
 
     # -- loaders ------------------------------------------------------------
@@ -235,16 +279,16 @@ class SeasonForm:
         week = int(eligible["week"].max())
         return eligible[eligible["week"] == week], week
 
-    def _latest_oline(self) -> tuple[pd.DataFrame, int | None]:
-        oline = read_optional_csv(OLINE_PATH)
+    @staticmethod
+    def _oline_ranks(path: Path, keep) -> pd.DataFrame:
+        """Weekly o-line ranks. Each is one game's rank, so callers average them."""
+        oline = read_optional_csv(path)
         if oline.empty:
-            return oline, None
+            return oline
         oline["week"] = pd.to_numeric(oline["week"], errors="coerce")
-        eligible = oline[oline["week"].notna() & (oline["week"] < self.target_week)]
-        if eligible.empty:
-            return eligible, None
-        week = int(eligible["week"].max())
-        return eligible[eligible["week"] == week], week
+        oline = oline[oline["week"].notna() & keep(oline["week"])].copy()
+        oline["team"] = oline["team"].map(normalize_team)
+        return oline
 
     @staticmethod
     def _bye_weeks(schedule: pd.DataFrame) -> dict[str, int]:
@@ -350,11 +394,25 @@ class SeasonForm:
             rows = frame[frame["player_name"].str.casefold() == name.casefold()]
         return rows
 
-    def oline_rank(self, team: str) -> float | None:
+    def oline_rank(self, team: str) -> tuple[float, str] | None:
+        """This season's average rank, shrunk toward last season's average.
+
+        One week's rank can swing from top five to bottom five on a single game,
+        so two weeks of it should not replace a full season of it.
+        """
         if self.oline.empty:
             return None
-        rows = self.oline[self.oline["team"].map(normalize_team) == team]
-        return None if rows.empty else float(rows.iloc[0]["oline_rank"])
+        now = self.oline[self.oline["team"] == team]["oline_rank"]
+        if now.empty:
+            return None
+        before = (self.prior_oline[self.prior_oline["team"] == team]["oline_rank"]
+                  if not self.prior_oline.empty else pd.Series(dtype="float64"))
+        prior = float(before.mean()) if len(before) else None
+        rank = blend(float(now.mean()), prior, in_season_weight(len(now)))
+        detail = f"{now.mean():.1f} over {len(now)} wk"
+        if prior is not None:
+            detail += f", blended with {CONTEXT_SEASON} avg {prior:.1f} -> {rank:.1f}"
+        return rank, detail
 
     def bye_passed(self, team: str) -> float | None:
         bye = self.bye_weeks.get(team)
@@ -451,11 +509,22 @@ def prior_season_target_share(training: pd.DataFrame, player_id, name: str) -> f
     return safe_ratio(player_targets, team_targets)
 
 
+def peer_target_share(training: pd.DataFrame, position: str, depth_score: float) -> float | None:
+    """Median prior-season target share of players at the same position and depth tier."""
+    peers = training[(training["bio_position"] == position)
+                     & (training["depth_chart_position"] == depth_score)]
+    if "dnp_flag" in peers.columns:
+        peers = peers[peers["dnp_flag"] != 1]
+    shares = peers["player_target_share_of_team"].dropna()
+    return float(shares.median()) if len(shares) else None
+
+
 def build_overrides(game: pd.Series, is_home: bool, bio: pd.Series, team: str, position: str,
                     week: int, oc: pd.Series | None, sos: pd.Series | None,
                     team_def: pd.Series | None, opp_def: pd.Series | None,
                     league_avg: float | None, depth_score: float,
-                    target_share: float | None, form: SeasonForm) -> dict[str, float]:
+                    target_share: float | None, form: SeasonForm,
+                    notes: dict[str, str]) -> dict[str, float]:
     spread = game.get("spread_line")
     total = game.get("total_line")
     spread = DEFAULT_SPREAD_LINE if pd.isna(spread) else float(spread)
@@ -501,15 +570,19 @@ def build_overrides(game: pd.Series, is_home: bool, bio: pd.Series, team: str, p
     else:
         values["prev_injuries_this_szn"] = 0.0
 
+    weight = in_season_weight(games_played, TREND_SHRINKAGE_GAMES)
     usage_trend, share_trend = form.usage_trends(player_id, player_name)
-    if usage_trend is not None:
-        values["usage_trend"] = usage_trend
-    if share_trend is not None:
-        values["target_share_trend"] = share_trend
+    trend_notes = []
+    for column, raw in (("usage_trend", usage_trend), ("target_share_trend", share_trend)):
+        if raw is not None:
+            values[column] = shrink_ratio(raw, weight)
+            trend_notes.append(f"{column} {raw:.2f} -> {values[column]:.2f}")
+    if trend_notes:
+        notes["trends"] = ", ".join(trend_notes) + f" ({TARGET_SEASON} weight {weight:.0%})"
 
-    oline_rank = form.oline_rank(team)
-    if oline_rank is not None:
-        values["oline_rank"] = oline_rank
+    oline = form.oline_rank(team)
+    if oline is not None:
+        values["oline_rank"], notes["oline"] = oline
 
     if target_share is not None:
         values["player_target_share_of_team"] = float(target_share)
@@ -654,22 +727,63 @@ def predict(name: str, requested_week: int | None = None, today: date | None = N
 
     depth_score, depth_source = form.depth_score(player.get("player_id"), player_name, position)
 
-    # In-season share once 2026 has games; otherwise last season's full-year share.
-    target_share = form.target_share(player.get("player_id"), player_name, team)
-    share_basis = f"{TARGET_SEASON} to date"
-    if target_share is None:
-        target_share = prior_season_target_share(training, player.get("player_id"), player_name)
-        share_basis = f"{CONTEXT_SEASON} season"
+    # Last season's full-year share is the baseline; 2026 games pull it toward
+    # this season's share only as fast as the sample size justifies. A player
+    # with no prior season (a rookie) starts from the median of his depth tier.
+    games = form.games_played(player.get("player_id"), player_name) or 0
+    weight = in_season_weight(games)
+    prior_share = prior_season_target_share(training, player.get("player_id"), player_name)
+    prior_basis = f"{CONTEXT_SEASON} season"
+    if prior_share is None:
+        prior_share = peer_target_share(training, position, depth_score)
+        prior_basis = f"{CONTEXT_SEASON} {position} depth-tier median"
+    season_share = form.target_share(player.get("player_id"), player_name, team)
+    target_share = blend(season_share, prior_share, weight)
+    if season_share is None:
+        share_basis = prior_basis
+    else:
+        prior_text = "n/a" if prior_share is None else f"{prior_share:.1%}"
+        share_basis = (f"{TARGET_SEASON} to date {season_share:.1%} x{weight:.0%} + "
+                       f"{prior_basis} {prior_text} x{1 - weight:.0%}")
 
+    notes: dict[str, str] = {}
     overrides = build_overrides(game, is_home, player, team, position, week,
                                 oc, sos, team_def, opp_def, league_avg, depth_score,
-                                target_share, form)
+                                target_share, form, notes)
     raw_vector, defaulted = assemble_vector(feature_cols, context, overrides, scaler_mean)
-    normalized = (raw_vector - np.asarray(scaler_mean)) / np.asarray(scaler_scale)
-    normalized = normalized.reshape(1, -1)
+
+    # The RB rushing models read target share as a role signal, so a pure
+    # between-the-tackles back would lose carries for not catching passes. They
+    # also see the typical share of his depth tier and no falling share trend,
+    # and keep whichever prediction is higher: tree models are not monotone in
+    # share, so only the max guarantees receiving work can help but never hurt.
+    # The receiving models still see the real share.
+    rushing_vector = None
+    if position == "RB":
+        rushing_vector = raw_vector.copy()
+        share_index = feature_cols.index("player_target_share_of_team")
+        trend_index = feature_cols.index("target_share_trend")
+        share_floor = peer_target_share(training, position, depth_score)
+        floored = []
+        if share_floor is not None and rushing_vector[share_index] < share_floor:
+            floored.append(f"share {rushing_vector[share_index]:.1%} -> depth-tier median {share_floor:.1%}")
+            rushing_vector[share_index] = share_floor
+        if rushing_vector[trend_index] < 1.0:
+            floored.append(f"share trend {rushing_vector[trend_index]:.2f} -> 1.00")
+            rushing_vector[trend_index] = 1.0
+        notes["rb_floor"] = ("floored " + ", ".join(floored) if floored
+                             else "share and trend at or above neutral, no floor needed")
+
+    def normalize(vector: np.ndarray) -> np.ndarray:
+        return ((vector - np.asarray(scaler_mean)) / np.asarray(scaler_scale)).reshape(1, -1)
 
     models = load_models(position_meta)
-    predictions = {stat: max(0.0, float(model.predict(normalized)[0])) for stat, model in models.items()}
+    predictions = {}
+    for stat, model in models.items():
+        value = float(model.predict(normalize(raw_vector))[0])
+        if rushing_vector is not None and stat in RB_RUSHING_STATS:
+            value = max(value, float(model.predict(normalize(rushing_vector))[0]))
+        predictions[stat] = max(0.0, value)
 
     weights = metadata["ppr_weights"]
     points = max(0.0, sum(predictions.get(stat, 0.0) * weight for stat, weight in weights.items()))
@@ -685,8 +799,12 @@ def predict(name: str, requested_week: int | None = None, today: date | None = N
         print(f"({detail})")
     share_text = "n/a" if target_share is None else f"{target_share:.1%}"
     print(f"[week: {week_reason}]")
-    print(f"[form: {form.summary()}; depth: {depth_source} ({depth_score:.2f}); "
-          f"target share: {share_text} ({share_basis})]")
+    print(f"[form: {form.summary()}; {games} game(s) played, {TARGET_SEASON} weight {weight:.0%}; "
+          f"depth: {depth_source} ({depth_score:.2f})]")
+    print(f"[target share: {share_text} ({share_basis})]")
+    for key, label in (("trends", "trends"), ("oline", "o-line rank"), ("rb_floor", "RB rushing")):
+        if key in notes:
+            print(f"[{label}: {notes[key]}]")
     print(f"[context: {context_source}; {len(defaulted)} of {len(feature_cols)} features unavailable]")
     print(f"[note: {SEASON_FORM_NOTES}]")
 
