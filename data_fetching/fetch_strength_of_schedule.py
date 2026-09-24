@@ -3,6 +3,8 @@ from pathlib import Path
 import nfl_data_py as nfl
 import pandas as pd
 
+from season_args import seasons
+
 START_YEAR = 2010
 END_YEAR = 2026
 OUTPUT_DIR = Path(__file__).resolve().parent.parent / "data" / "raw" / "strength_of_schedule"
@@ -38,6 +40,10 @@ def build_matchups(schedules: pd.DataFrame) -> pd.DataFrame:
 
 
 def main() -> None:
+    # Opponent win % needs every season loaded, so --years only picks which
+    # season files get rewritten.
+    years = seasons(START_YEAR, END_YEAR, __doc__)
+
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
     schedules = nfl.import_schedules(list(range(START_YEAR - 1, END_YEAR + 1)))
@@ -72,7 +78,7 @@ def main() -> None:
         preseason_sos=("preseason_win_pct", "mean"),
     ).reset_index()
 
-    for year in range(START_YEAR, END_YEAR + 1):
+    for year in years:
         year_data = sos[sos["season"] == year][["season", "team", "preseason_sos", "adjusted_sos"]]
 
         if year_data.empty:

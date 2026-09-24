@@ -1,6 +1,24 @@
+"""Project a player's PPR line for a given week of the 2026 season.
+
+    python prediction.py "Ja'Marr Chase"              # next unplayed week
+    python prediction.py "Ja'Marr Chase" --week 7     # a specific week
+
+With no --week, the upcoming week is read off the 2026 schedule: the first
+regular-season week that still has an unplayed game, skipping past weeks whose
+scores simply have not landed in the feed yet.
+
+The models are trained through 2025, so a player's baseline feature vector still
+comes from their 2025 game log. Anything the 2026 season has actually settled by
+kickoff of the target week -- snap-adjacent usage, target share, depth chart,
+o-line form, injuries, the game's betting line -- is layered on top of that
+baseline, so a Week 7 projection is not a Week 1 projection with the week number
+changed. See SEASON_FORM_NOTES for what is and is not refreshed.
+"""
+
+import argparse
 import json
 import pickle
-import sys
+from datetime import date
 from pathlib import Path
 
 import numpy as np
@@ -11,24 +29,31 @@ MODEL_DIR = PROJECT_DIR / "model"
 RAW_DIR = PROJECT_DIR / "data" / "raw"
 PROCESSED_DIR = PROJECT_DIR / "data" / "processed"
 
-METADATA_PATH = MODEL_DIR / "model_metadata.json"
-SCHEDULE_PATH = RAW_DIR / "schedules" / "schedules_2026.csv"
-BIO_PATH = RAW_DIR / "bio_data" / "bio_data_2026.csv"
-OC_PATH = RAW_DIR / "offensive_coordinators" / "offensive_coordinators_2026.csv"
-SOS_PATH = RAW_DIR / "strength_of_schedule" / "strength_of_schedule_2026.csv"
-DEPTH_CHART_PATH = RAW_DIR / "depth_chart" / "depth_chart_2026.csv"
-TEAM_AGGS_PATH = PROCESSED_DIR / "team_aggs.parquet"
-TRAINING_PATH = PROCESSED_DIR / "final_training_data.parquet"
-
 TARGET_SEASON = 2026
 CONTEXT_SEASON = 2025
-TARGET_WEEK = 1
+
+METADATA_PATH = MODEL_DIR / "model_metadata.json"
+SCHEDULE_PATH = RAW_DIR / "schedules" / f"schedules_{TARGET_SEASON}.csv"
+BIO_PATH = RAW_DIR / "bio_data" / f"bio_data_{TARGET_SEASON}.csv"
+OC_PATH = RAW_DIR / "offensive_coordinators" / f"offensive_coordinators_{TARGET_SEASON}.csv"
+SOS_PATH = RAW_DIR / "strength_of_schedule" / f"strength_of_schedule_{TARGET_SEASON}.csv"
+DEPTH_CHART_PATH = RAW_DIR / "depth_chart" / f"depth_chart_{TARGET_SEASON}.csv"
+BOX_SCORE_PATH = RAW_DIR / "box_scores" / f"box_scores_{TARGET_SEASON}.csv"
+PRIOR_BOX_SCORE_PATH = RAW_DIR / "box_scores" / f"box_scores_{CONTEXT_SEASON}.csv"
+INJURY_PATH = RAW_DIR / "injury_reports" / f"injury_reports_{TARGET_SEASON}.csv"
+OLINE_PATH = RAW_DIR / "oline_rankings_weekly" / f"oline_rankings_weekly_{TARGET_SEASON}.csv"
+TEAM_AGGS_PATH = PROCESSED_DIR / "team_aggs.parquet"
+TRAINING_PATH = PROCESSED_DIR / "final_training_data.parquet"
 
 DEFAULT_WEATHER_TEMP = 70.0
 DEFAULT_WEATHER_WIND = 5.0
 DEFAULT_SPREAD_LINE = 0.0
 DEFAULT_TOTAL_LINE = 45.0
 DEPTH_SCORE_UNKNOWN = 0.7
+NO_INJURY_WEEKS = 99.0
+
+# Statuses Layer 1 treats as a did-not-play when it builds dnp_flag.
+DNP_STATUSES = ("Out", "IR")
 
 TEAM_ALIASES = {"LAR": "LA", "STL": "LA", "OAK": "LV", "SD": "LAC", "WSH": "WAS",
                 "ARZ": "ARI", "BLT": "BAL", "CLV": "CLE", "HST": "HOU", "SL": "LA"}
@@ -44,6 +69,12 @@ DETAIL_FORMATS = {
     "WR": [("receptions", "rec", 1), ("receiving_yards", "yd", 0), ("receiving_tds", "TD", 1)],
     "TE": [("receptions", "rec", 1), ("receiving_yards", "yd", 0), ("receiving_tds", "TD", 1)],
 }
+
+# What moves week to week, and what is still pinned to the prior season.
+SEASON_FORM_NOTES = (
+    f"team defensive strength and matchup advantage are still {CONTEXT_SEASON} "
+    f"season averages (Layer 2 has not been run on {TARGET_SEASON})"
+)
 
 
 class PredictionError(Exception):
@@ -74,6 +105,272 @@ def load_csv(path: Path, label: str) -> pd.DataFrame:
     return pd.read_csv(path, low_memory=False)
 
 
+def read_optional_csv(path: Path) -> pd.DataFrame:
+    if not path.exists():
+        return pd.DataFrame()
+    return pd.read_csv(path, low_memory=False)
+
+
+def safe_ratio(numerator: float, denominator: float) -> float | None:
+    if denominator is None or numerator is None:
+        return None
+    if not np.isfinite(denominator) or denominator == 0:
+        return None
+    value = numerator / denominator
+    return float(value) if np.isfinite(value) else None
+
+
+# ---------------------------------------------------------------------------
+# Week selection
+# ---------------------------------------------------------------------------
+
+def regular_season(schedule: pd.DataFrame) -> pd.DataFrame:
+    reg = schedule[schedule["game_type"] == "REG"].copy()
+    reg["week"] = pd.to_numeric(reg["week"], errors="coerce")
+    reg["gameday"] = pd.to_datetime(reg["gameday"], errors="coerce")
+    return reg[reg["week"].notna()]
+
+
+def resolve_week(schedule: pd.DataFrame, requested: int | None, today: date) -> tuple[int, str]:
+    """Pick the week to project and explain the choice."""
+    reg = regular_season(schedule)
+    if reg.empty:
+        fail(f"{SCHEDULE_PATH.name} has no regular-season games")
+
+    weeks = sorted(int(w) for w in reg["week"].unique())
+
+    if requested is not None:
+        if requested not in weeks:
+            fail(f"week {requested} is not in the {TARGET_SEASON} regular season "
+                 f"(weeks {weeks[0]}-{weeks[-1]})")
+        played = reg[(reg["week"] == requested) & reg["home_score"].notna()]
+        if len(played) == len(reg[reg["week"] == requested]):
+            return requested, f"week {requested} requested (already played - this is a backtest)"
+        return requested, f"week {requested} requested"
+
+    complete = reg.groupby("week")["home_score"].apply(lambda s: s.notna().all())
+    last_gameday = reg.groupby("week")["gameday"].max()
+
+    unplayed = [w for w in weeks if not bool(complete.get(w, False))]
+    if not unplayed:
+        return weeks[-1], f"{TARGET_SEASON} regular season is complete; showing week {weeks[-1]}"
+
+    # A week whose last game has already kicked off but whose scores have not
+    # reached the feed is not "upcoming" - skip to the first week still ahead.
+    ahead = [w for w in unplayed
+             if pd.notna(last_gameday.get(w)) and last_gameday[w].date() >= today]
+    if ahead:
+        week = ahead[0]
+        kickoff = reg[reg["week"] == week]["gameday"].min()
+        return week, f"next unplayed week as of {today:%Y-%m-%d} (week {week} opens {kickoff:%b %d})"
+
+    week = unplayed[0]
+    return week, (f"week {week} is the first without final scores, though its games are "
+                  f"already past - the results feed may be behind")
+
+
+# ---------------------------------------------------------------------------
+# 2026 in-season form
+# ---------------------------------------------------------------------------
+
+class SeasonForm:
+    """What the 2026 season has settled before the target week kicks off.
+
+    Every lookup is restricted to weeks strictly before the target week, so a
+    projection never sees the game it is projecting.
+    """
+
+    def __init__(self, target_week: int, schedule: pd.DataFrame):
+        self.target_week = target_week
+        self.weeks_available: list[int] = []
+
+        box = read_optional_csv(BOX_SCORE_PATH)
+        if not box.empty:
+            box = box[box["season_type"] == "REG"].copy()
+            box["week"] = pd.to_numeric(box["week"], errors="coerce")
+            box = box[box["week"].notna() & (box["week"] < target_week)]
+            if not box.empty:
+                box["team"] = box["recent_team"].map(normalize_team)
+                self.weeks_available = sorted(int(w) for w in box["week"].unique())
+        self.box = box
+
+        # The prior season is trimmed to the span 2026 has actually played, not to
+        # the target week. Projecting week 7 off two played weeks would otherwise
+        # divide two weeks of usage by six, reading a data gap as a collapse.
+        prior = read_optional_csv(PRIOR_BOX_SCORE_PATH)
+        if not prior.empty and self.weeks_available:
+            prior = prior[prior["season_type"] == "REG"].copy()
+            prior["week"] = pd.to_numeric(prior["week"], errors="coerce")
+            prior = prior[prior["week"].notna() & (prior["week"] <= max(self.weeks_available))]
+        elif not prior.empty:
+            prior = prior.iloc[0:0]
+        self.prior_box = prior
+
+        injuries = read_optional_csv(INJURY_PATH)
+        if not injuries.empty:
+            injuries = injuries[injuries["game_type"] == "REG"].copy()
+            injuries["week"] = pd.to_numeric(injuries["week"], errors="coerce")
+            injuries = injuries[injuries["week"].notna() & (injuries["week"] < target_week)
+                                & injuries["report_status"].isin(DNP_STATUSES)]
+        self.injuries = injuries
+
+        self.depth_chart, self.depth_week = self._latest_depth_chart()
+        self.oline, self.oline_week = self._latest_oline()
+        self.bye_weeks = self._bye_weeks(schedule)
+
+    # -- loaders ------------------------------------------------------------
+
+    def _latest_depth_chart(self) -> tuple[pd.DataFrame, int | None]:
+        """The most recent chart published at or before the target week."""
+        chart = read_optional_csv(DEPTH_CHART_PATH)
+        if chart.empty:
+            return chart, None
+        chart["week"] = pd.to_numeric(chart["week"], errors="coerce")
+        eligible = chart[chart["week"].notna() & (chart["week"] <= self.target_week)]
+        if eligible.empty:
+            # Projecting before any chart exists; fall back to the earliest one.
+            eligible = chart[chart["week"] == chart["week"].min()]
+        if eligible.empty:
+            return eligible, None
+        week = int(eligible["week"].max())
+        return eligible[eligible["week"] == week], week
+
+    def _latest_oline(self) -> tuple[pd.DataFrame, int | None]:
+        oline = read_optional_csv(OLINE_PATH)
+        if oline.empty:
+            return oline, None
+        oline["week"] = pd.to_numeric(oline["week"], errors="coerce")
+        eligible = oline[oline["week"].notna() & (oline["week"] < self.target_week)]
+        if eligible.empty:
+            return eligible, None
+        week = int(eligible["week"].max())
+        return eligible[eligible["week"] == week], week
+
+    @staticmethod
+    def _bye_weeks(schedule: pd.DataFrame) -> dict[str, int]:
+        """A team's bye is the one regular-season week it has no game."""
+        reg = regular_season(schedule)
+        played_weeks: dict[str, set[int]] = {}
+        for column in ("home_team", "away_team"):
+            for team, week in zip(reg[column].map(normalize_team), reg["week"]):
+                if team is not None and pd.notna(week):
+                    played_weeks.setdefault(team, set()).add(int(week))
+
+        byes = {}
+        for team, weeks in played_weeks.items():
+            missing = set(range(min(weeks), max(weeks) + 1)) - weeks
+            if len(missing) == 1:
+                byes[team] = next(iter(missing))
+        return byes
+
+    # -- player lookups -----------------------------------------------------
+
+    def has_data(self) -> bool:
+        return bool(self.weeks_available)
+
+    def _player_rows(self, frame: pd.DataFrame, player_id, name: str) -> pd.DataFrame:
+        if frame.empty:
+            return frame
+        rows = frame[frame["player_id"] == player_id] if player_id is not None else frame.iloc[0:0]
+        if rows.empty and "player_display_name" in frame.columns:
+            rows = frame[frame["player_display_name"].str.casefold() == name.casefold()]
+        return rows
+
+    def games_played(self, player_id, name: str) -> int | None:
+        if not self.has_data():
+            return None
+        return int(len(self._player_rows(self.box, player_id, name)))
+
+    def injury_history(self, player_id) -> tuple[float, float] | None:
+        """(prev_injuries_this_szn, weeks_since_injury) from 2026 injury reports."""
+        if self.injuries.empty or player_id is None:
+            return None
+        rows = self.injuries[self.injuries["gsis_id"] == player_id]
+        if rows.empty:
+            return 0.0, NO_INJURY_WEEKS
+        last = float(rows["week"].max())
+        return float(len(rows)), float(self.target_week) - last
+
+    def target_share(self, player_id, name: str, team: str) -> float | None:
+        """Player targets over team targets, both cumulative through last week."""
+        if not self.has_data():
+            return None
+        rows = self._player_rows(self.box, player_id, name)
+        if rows.empty:
+            return None
+        team_rows = self.box[self.box["team"] == team]
+        return safe_ratio(float(rows["targets"].fillna(0.0).sum()),
+                          float(team_rows["targets"].fillna(0.0).sum()))
+
+    def usage_trends(self, player_id, name: str) -> tuple[float | None, float | None]:
+        """This season's usage and target share against the same span last season.
+
+        Mirrors Layer 3's usage_trend / target_share_trend, with both sides cut to
+        the same number of weeks so the ratio stays comparable.
+        """
+        if not self.has_data() or self.prior_box.empty:
+            return None, None
+
+        now = self._player_rows(self.box, player_id, name)
+        before = self._player_rows(self.prior_box, player_id, name)
+        if now.empty or before.empty:
+            return None, None
+
+        def usage(rows: pd.DataFrame) -> float:
+            return float(rows["targets"].fillna(0.0).sum() + rows["carries"].fillna(0.0).sum())
+
+        def avg_share(rows: pd.DataFrame) -> float | None:
+            shares = rows["target_share"].fillna(0.0)
+            return float(shares.mean()) if len(shares) else None
+
+        usage_trend = safe_ratio(usage(now), usage(before))
+        share_now, share_before = avg_share(now), avg_share(before)
+        share_trend = (safe_ratio(share_now, share_before)
+                       if share_now is not None and share_before is not None else None)
+        return usage_trend, share_trend
+
+    def depth_score(self, player_id, name: str, position: str) -> tuple[float, str]:
+        if self.depth_chart.empty:
+            return DEPTH_SCORE_UNKNOWN, f"no {DEPTH_CHART_PATH.name}"
+
+        rows = self._player_rows_by_name(self.depth_chart, player_id, name)
+        if rows.empty:
+            return DEPTH_SCORE_UNKNOWN, "not on depth chart"
+
+        exact = rows[rows["position"].astype("string").str.upper() == position]
+        chosen = (exact if not exact.empty else rows).sort_values("depth_chart_rank")
+        rank = chosen.iloc[0]["depth_chart_rank"]
+        score = float(chosen.iloc[0]["depth_chart_position"])
+        return score, f"{position}{int(rank)} on week {self.depth_week} chart"
+
+    @staticmethod
+    def _player_rows_by_name(frame: pd.DataFrame, player_id, name: str) -> pd.DataFrame:
+        rows = frame[frame["player_id"] == player_id] if player_id is not None else frame.iloc[0:0]
+        if rows.empty:
+            rows = frame[frame["player_name"].str.casefold() == name.casefold()]
+        return rows
+
+    def oline_rank(self, team: str) -> float | None:
+        if self.oline.empty:
+            return None
+        rows = self.oline[self.oline["team"].map(normalize_team) == team]
+        return None if rows.empty else float(rows.iloc[0]["oline_rank"])
+
+    def bye_passed(self, team: str) -> float | None:
+        bye = self.bye_weeks.get(team)
+        return None if bye is None else float(self.target_week > bye)
+
+    def summary(self) -> str:
+        if not self.has_data():
+            return f"no {TARGET_SEASON} games played yet; all form carried from {CONTEXT_SEASON}"
+        span = f"{self.weeks_available[0]}-{self.weeks_available[-1]}"
+        return f"{TARGET_SEASON} weeks {span}"
+
+
+# ---------------------------------------------------------------------------
+# Baseline context (prior season) and feature assembly
+# ---------------------------------------------------------------------------
+
 def find_player(bio: pd.DataFrame, name: str) -> pd.Series:
     exact = bio[bio["player_name"] == name]
     if exact.empty:
@@ -85,24 +382,27 @@ def find_player(bio: pd.DataFrame, name: str) -> pd.Series:
 
     ranked = exact.copy()
     ranked["_rank"] = ranked["position"].isin(DEF_STRENGTH_COLS).astype(int)
-    ranked = ranked.sort_values("_rank", ascending=False)
+    # Prefer the most recent roster snapshot, so an in-season move is picked up.
+    sort_cols = ["_rank"] + (["week"] if "week" in ranked.columns else [])
+    ranked = ranked.sort_values(sort_cols, ascending=False)
     return ranked.iloc[0]
 
 
-def find_game(schedule: pd.DataFrame, team: str) -> tuple[pd.Series, bool]:
-    week = schedule[schedule["week"] == TARGET_WEEK].copy()
-    week["home_team"] = week["home_team"].map(normalize_team)
-    week["away_team"] = week["away_team"].map(normalize_team)
+def find_game(schedule: pd.DataFrame, team: str, week: int) -> tuple[pd.Series, bool]:
+    games = regular_season(schedule)
+    games = games[games["week"] == week].copy()
+    games["home_team"] = games["home_team"].map(normalize_team)
+    games["away_team"] = games["away_team"].map(normalize_team)
 
-    home = week[week["home_team"] == team]
+    home = games[games["home_team"] == team]
     if not home.empty:
         return home.iloc[0], True
 
-    away = week[week["away_team"] == team]
+    away = games[games["away_team"] == team]
     if not away.empty:
         return away.iloc[0], False
 
-    fail(f"no week {TARGET_WEEK} game found for {team} in {SCHEDULE_PATH.name} (bye or missing schedule row)")
+    fail(f"{team} has no week {week} game in {SCHEDULE_PATH.name} - it is their bye week")
 
 
 def lookup_row(frame: pd.DataFrame, team_col: str, team: str) -> pd.Series | None:
@@ -135,29 +435,6 @@ def player_context_row(training: pd.DataFrame, player_id: str, name: str, positi
     return peers[feature_cols].median(numeric_only=True), f"{CONTEXT_SEASON} {position} median"
 
 
-def depth_chart_score(player_id, name: str, position: str) -> tuple[float, str]:
-    if not DEPTH_CHART_PATH.exists():
-        return DEPTH_SCORE_UNKNOWN, f"no {DEPTH_CHART_PATH.name}"
-
-    chart = pd.read_csv(DEPTH_CHART_PATH, low_memory=False)
-    week = chart[chart["week"] == TARGET_WEEK]
-    if week.empty:
-        week = chart[chart["week"] == chart["week"].min()]
-
-    rows = week[week["player_id"] == player_id] if player_id is not None else week.iloc[0:0]
-    if rows.empty:
-        rows = week[week["player_name"].str.casefold() == name.casefold()]
-    if rows.empty:
-        return DEPTH_SCORE_UNKNOWN, "not on depth chart"
-
-    exact = rows[rows["position"].astype("string").str.upper() == position]
-    chosen = exact if not exact.empty else rows
-    chosen = chosen.sort_values("depth_chart_rank")
-    rank = chosen.iloc[0]["depth_chart_rank"]
-    score = float(chosen.iloc[0]["depth_chart_position"])
-    return score, f"{position}{int(rank)} on depth chart"
-
-
 def prior_season_target_share(training: pd.DataFrame, player_id, name: str) -> float | None:
     if "targets" not in training.columns or "team" not in training.columns:
         return None
@@ -171,43 +448,68 @@ def prior_season_target_share(training: pd.DataFrame, player_id, name: str) -> f
     player_targets = float(rows["targets"].fillna(0.0).sum())
     player_team = rows.sort_values("week")["team"].iloc[-1]
     team_targets = float(training[training["team"] == player_team]["targets"].fillna(0.0).sum())
-    if team_targets <= 0:
-        return None
-    return player_targets / team_targets
+    return safe_ratio(player_targets, team_targets)
 
 
-def build_overrides(game: pd.Series, is_home: bool, bio: pd.Series, team: str, opponent: str,
-                    position: str, oc: pd.Series | None, sos: pd.Series | None,
+def build_overrides(game: pd.Series, is_home: bool, bio: pd.Series, team: str, position: str,
+                    week: int, oc: pd.Series | None, sos: pd.Series | None,
                     team_def: pd.Series | None, opp_def: pd.Series | None,
                     league_avg: float | None, depth_score: float,
-                    target_share: float | None) -> dict[str, float]:
+                    target_share: float | None, form: SeasonForm) -> dict[str, float]:
     spread = game.get("spread_line")
     total = game.get("total_line")
     spread = DEFAULT_SPREAD_LINE if pd.isna(spread) else float(spread)
     total = DEFAULT_TOTAL_LINE if pd.isna(total) else float(total)
 
-    home_rest = game.get("home_rest")
-    away_rest = game.get("away_rest")
-    rest = home_rest if is_home else away_rest
+    rest = game.get("home_rest") if is_home else game.get("away_rest")
+
+    # Weather is only published once a game is close; future weeks get defaults.
+    temp = game.get("temp")
+    wind = game.get("wind")
+    temp = DEFAULT_WEATHER_TEMP if pd.isna(temp) else float(temp)
+    wind = DEFAULT_WEATHER_WIND if pd.isna(wind) else float(wind)
 
     values: dict[str, float] = {
-        "week": float(TARGET_WEEK),
-        "weeks_into_season": 1.0,
-        "games_played_this_szn": 0.0,
-        "bye_week_passed": 0.0,
-        "prev_injuries_this_szn": 0.0,
+        "week": float(week),
+        "weeks_into_season": float(week),
         "is_home": 1.0 if is_home else 0.0,
         "spread_line": spread,
         "total_line": total,
         "implied_home_total": (total - spread) / 2,
         "implied_away_total": (total + spread) / 2,
-        "weather_temp": DEFAULT_WEATHER_TEMP,
-        "weather_wind": DEFAULT_WEATHER_WIND,
-        "sched_temp": DEFAULT_WEATHER_TEMP,
-        "sched_wind": DEFAULT_WEATHER_WIND,
+        "weather_temp": temp,
+        "weather_wind": wind,
+        "sched_temp": temp,
+        "sched_wind": wind,
         "rest_days": float(rest) if pd.notna(rest) else 7.0,
         "depth_chart_position": float(depth_score),
     }
+
+    player_id = bio.get("player_id")
+    player_name = bio.get("player_name", "")
+
+    games_played = form.games_played(player_id, player_name)
+    values["games_played_this_szn"] = float(games_played) if games_played is not None else 0.0
+
+    bye_passed = form.bye_passed(team)
+    if bye_passed is not None:
+        values["bye_week_passed"] = bye_passed
+
+    injuries = form.injury_history(player_id)
+    if injuries is not None:
+        values["prev_injuries_this_szn"], values["weeks_since_injury"] = injuries
+    else:
+        values["prev_injuries_this_szn"] = 0.0
+
+    usage_trend, share_trend = form.usage_trends(player_id, player_name)
+    if usage_trend is not None:
+        values["usage_trend"] = usage_trend
+    if share_trend is not None:
+        values["target_share_trend"] = share_trend
+
+    oline_rank = form.oline_rank(team)
+    if oline_rank is not None:
+        values["oline_rank"] = oline_rank
 
     if target_share is not None:
         values["player_target_share_of_team"] = float(target_share)
@@ -296,10 +598,14 @@ def format_detail(position: str, predictions: dict[str, float]) -> str:
     return ", ".join(parts)
 
 
-def predict(name: str) -> None:
+def predict(name: str, requested_week: int | None = None, today: date | None = None) -> None:
+    today = today or date.today()
+
     metadata = load_json(METADATA_PATH)
-    bio = load_csv(BIO_PATH, "2026 bio data")
-    schedule = load_csv(SCHEDULE_PATH, "2026 schedule")
+    bio = load_csv(BIO_PATH, f"{TARGET_SEASON} bio data")
+    schedule = load_csv(SCHEDULE_PATH, f"{TARGET_SEASON} schedule")
+
+    week, week_reason = resolve_week(schedule, requested_week, today)
 
     player = find_player(bio, name)
     position = str(player.get("position", "")).upper()
@@ -313,7 +619,7 @@ def predict(name: str) -> None:
     if team is None:
         fail(f"{player_name} has no {TARGET_SEASON} team assigned")
 
-    game, is_home = find_game(schedule, team)
+    game, is_home = find_game(schedule, team, week)
     opponent = normalize_team(game["away_team"] if is_home else game["home_team"])
 
     position_meta = metadata["positions"][position]
@@ -331,8 +637,10 @@ def predict(name: str) -> None:
     context, context_source = player_context_row(training, player.get("player_id"), player_name,
                                                  position, feature_cols)
 
-    oc = lookup_row(load_csv(OC_PATH, "2026 coordinator data"), "team", team)
-    sos = lookup_row(load_csv(SOS_PATH, "2026 strength of schedule"), "team", team)
+    form = SeasonForm(week, schedule)
+
+    oc = lookup_row(load_csv(OC_PATH, f"{TARGET_SEASON} coordinator data"), "team", team)
+    sos = lookup_row(load_csv(SOS_PATH, f"{TARGET_SEASON} strength of schedule"), "team", team)
 
     team_def = opp_def = None
     league_avg = None
@@ -344,11 +652,18 @@ def predict(name: str) -> None:
         if position in DEF_STRENGTH_COLS and not aggs.empty:
             league_avg = aggs[DEF_STRENGTH_COLS[position]].mean()
 
-    depth_score, depth_source = depth_chart_score(player.get("player_id"), player_name, position)
-    target_share = prior_season_target_share(training, player.get("player_id"), player_name)
+    depth_score, depth_source = form.depth_score(player.get("player_id"), player_name, position)
 
-    overrides = build_overrides(game, is_home, player, team, opponent, position,
-                                oc, sos, team_def, opp_def, league_avg, depth_score, target_share)
+    # In-season share once 2026 has games; otherwise last season's full-year share.
+    target_share = form.target_share(player.get("player_id"), player_name, team)
+    share_basis = f"{TARGET_SEASON} to date"
+    if target_share is None:
+        target_share = prior_season_target_share(training, player.get("player_id"), player_name)
+        share_basis = f"{CONTEXT_SEASON} season"
+
+    overrides = build_overrides(game, is_home, player, team, position, week,
+                                oc, sos, team_def, opp_def, league_avg, depth_score,
+                                target_share, form)
     raw_vector, defaulted = assemble_vector(feature_cols, context, overrides, scaler_mean)
     normalized = (raw_vector - np.asarray(scaler_mean)) / np.asarray(scaler_scale)
     normalized = normalized.reshape(1, -1)
@@ -357,30 +672,39 @@ def predict(name: str) -> None:
     predictions = {stat: max(0.0, float(model.predict(normalized)[0])) for stat, model in models.items()}
 
     weights = metadata["ppr_weights"]
-    points = sum(predictions.get(stat, 0.0) * weight for stat, weight in weights.items())
-    points = max(0.0, points)
+    points = max(0.0, sum(predictions.get(stat, 0.0) * weight for stat, weight in weights.items()))
 
     location = "vs" if is_home else "at"
-    print(f"{player_name} ({position}, {team} {location} {opponent}, Week {TARGET_WEEK})")
+    kickoff = game.get("gameday")
+    kickoff_text = f", {pd.to_datetime(kickoff):%b %d}" if pd.notna(kickoff) else ""
+
+    print(f"{player_name} ({position}, {team} {location} {opponent}, Week {week}{kickoff_text})")
     print(f"Projected: {points:.1f} PPR")
     detail = format_detail(position, predictions)
     if detail:
         print(f"({detail})")
     share_text = "n/a" if target_share is None else f"{target_share:.1%}"
-    print(f"[depth: {depth_source} ({depth_score:.2f}); {CONTEXT_SEASON} target share: {share_text}]")
+    print(f"[week: {week_reason}]")
+    print(f"[form: {form.summary()}; depth: {depth_source} ({depth_score:.2f}); "
+          f"target share: {share_text} ({share_basis})]")
     print(f"[context: {context_source}; {len(defaulted)} of {len(feature_cols)} features unavailable]")
+    print(f"[note: {SEASON_FORM_NOTES}]")
 
 
 def main() -> None:
-    if len(sys.argv) < 2 or not sys.argv[1].strip():
-        print("Usage: python prediction.py 'Player Name'")
-        sys.exit(1)
+    parser = argparse.ArgumentParser(
+        description=f"Project a player's PPR line for a {TARGET_SEASON} week.",
+        epilog="With no --week, the next unplayed week of the schedule is used.")
+    parser.add_argument("name", nargs="+", help="player name, e.g. \"Ja'Marr Chase\"")
+    parser.add_argument("-w", "--week", type=int, metavar="N",
+                        help=f"{TARGET_SEASON} regular-season week to project (default: next unplayed)")
+    args = parser.parse_args()
 
     try:
-        predict(" ".join(sys.argv[1:]).strip())
+        predict(" ".join(args.name).strip(), args.week)
     except PredictionError as e:
         print(f"Error: {e}")
-        sys.exit(1)
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":

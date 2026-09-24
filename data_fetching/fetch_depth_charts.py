@@ -3,6 +3,8 @@ from pathlib import Path
 import nflreadpy as nfl
 import pandas as pd
 
+from season_args import seasons
+
 START_YEAR = 2010
 END_YEAR = 2026
 
@@ -122,7 +124,7 @@ def fetch_season(season: int) -> pd.DataFrame:
 def main() -> None:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-    for season in range(START_YEAR, END_YEAR + 1):
+    for season in seasons(START_YEAR, END_YEAR, __doc__):
         try:
             data = fetch_season(season)
         except Exception as exc:

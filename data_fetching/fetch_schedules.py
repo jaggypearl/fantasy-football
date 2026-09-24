@@ -2,6 +2,8 @@ from pathlib import Path
 
 import nfl_data_py as nfl
 
+from season_args import seasons
+
 START_YEAR = 2010
 END_YEAR = 2026
 OUTPUT_DIR = Path(__file__).resolve().parent.parent / 'data' / 'raw' / 'schedules'
@@ -10,7 +12,7 @@ OUTPUT_DIR = Path(__file__).resolve().parent.parent / 'data' / 'raw' / 'schedule
 def main() -> None:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-    for year in range(START_YEAR, END_YEAR + 1):
+    for year in seasons(START_YEAR, END_YEAR, __doc__):
         data = nfl.import_schedules([year])
 
         if data is None:

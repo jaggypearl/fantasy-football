@@ -2,8 +2,10 @@ from pathlib import Path
 
 import pandas as pd
 
+from season_args import seasons
+
 START_YEAR = 2010
-END_YEAR = 2025
+END_YEAR = 2026
 INPUT_DIR = Path(__file__).resolve().parent.parent / "data" / "raw" / "play_by_play"
 OUTPUT_DIR = Path(__file__).resolve().parent.parent / "data" / "raw" / "oline_rankings_weekly"
 USE_COLS = [
@@ -63,7 +65,7 @@ def compute_oline_rankings(pbp: pd.DataFrame) -> pd.DataFrame:
 def main() -> None:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-    for year in range(START_YEAR, END_YEAR + 1):
+    for year in seasons(START_YEAR, END_YEAR, __doc__):
         input_path = INPUT_DIR / f"play_by_play_{year}.csv"
 
         if not input_path.exists():
