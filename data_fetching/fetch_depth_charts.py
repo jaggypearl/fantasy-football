@@ -13,7 +13,7 @@ OUTPUT_DIR = PROJECT_DIR / "data" / "raw" / "depth_chart"
 SCHEDULE_DIR = PROJECT_DIR / "data" / "raw" / "schedules"
 
 OUTPUT_COLUMNS = ["season", "week", "team", "player_id", "player_name",
-                  "position", "depth_chart_rank", "depth_chart_position"]
+                  "position", "depth_chart_rank", "depth_chart_position", "snapshot_dt"]
 
 TEAM_ALIASES = {"LAR": "LA", "STL": "LA", "OAK": "LV", "SD": "LAC", "WSH": "WAS",
                 "ARZ": "ARI", "BLT": "BAL", "CLV": "CLE", "HST": "HOU", "SL": "LA"}
@@ -37,13 +37,18 @@ def encode_depth(rank) -> float:
 
 
 def week_start_dates(season: int) -> pd.Series:
+    """Each week's first kickoff, in UTC to match the snapshot timestamps."""
     path = SCHEDULE_DIR / f"schedules_{season}.csv"
     if not path.exists():
         return pd.Series(dtype="datetime64[ns]")
     sched = pd.read_csv(path, low_memory=False)
     sched = sched[sched["game_type"] == "REG"]
-    sched["gameday"] = pd.to_datetime(sched["gameday"], errors="coerce")
-    starts = sched.groupby("week")["gameday"].min().dropna().sort_index()
+    # gametime is Eastern; a missing one falls back to midnight, which only
+    # makes the cutoff earlier.
+    kickoff = pd.to_datetime(sched["gameday"] + " " + sched["gametime"].fillna("00:00"), errors="coerce")
+    kickoff = (kickoff.dt.tz_localize("America/New_York", ambiguous="NaT", nonexistent="NaT")
+               .dt.tz_convert("UTC").dt.tz_localize(None))
+    starts = kickoff.groupby(sched["week"]).min().dropna().sort_index()
     return starts
 
 
@@ -76,12 +81,17 @@ def from_snapshots(raw: pd.DataFrame, season: int) -> pd.DataFrame:
     if starts.empty:
         return pd.DataFrame(columns=OUTPUT_COLUMNS)
 
+    # A week's chart is the last snapshot before it opens. The one week that has
+    # not opened yet gets the newest snapshot, so the upcoming game sees the chart
+    # as of today rather than the one from last week's kickoff. Weeks after that
+    # get nothing, or every future week would carry a copy of today's chart.
     horizon = df["dt"].max()
     frames = []
     for week, start in starts.items():
-        if start > horizon:
-            continue
         eligible = df[df["dt"] <= start]
+        if start > horizon:
+            if frames and frames[-1]["dt"].iloc[0] == horizon:
+                break
         if eligible.empty:
             continue
         latest = eligible["dt"].max()
@@ -101,6 +111,7 @@ def from_snapshots(raw: pd.DataFrame, season: int) -> pd.DataFrame:
         "player_name": snaps["player_name"],
         "position": snaps["pos_abb"].astype("string").str.upper(),
         "depth_chart_rank": pd.to_numeric(snaps["pos_rank"], errors="coerce"),
+        "snapshot_dt": snaps["dt"],
     })
     out = out.sort_values("depth_chart_rank").drop_duplicates(
         subset=["season", "week", "player_id", "position"], keep="first")
@@ -117,28 +128,35 @@ def fetch_season(season: int) -> pd.DataFrame:
         out = from_snapshots(raw, season)
     if out.empty:
         return pd.DataFrame(columns=OUTPUT_COLUMNS)
+    if "snapshot_dt" not in out.columns:
+        out["snapshot_dt"] = pd.NaT
     out["depth_chart_position"] = out["depth_chart_rank"].map(encode_depth)
     return out[OUTPUT_COLUMNS].sort_values(["week", "team", "position", "depth_chart_rank"])
 
 
-def main() -> None:
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+def save_season(season: int) -> str:
+    """Fetch one season and overwrite its CSV. Returns a one-line summary."""
+    data = fetch_season(season)
+    if data.empty:
+        return f"{season}: no depth chart rows returned; kept the existing file."
 
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    output_path = OUTPUT_DIR / f"depth_chart_{season}.csv"
+    data.to_csv(output_path, index=False, encoding="utf-8")
+    summary = (f"Saved {output_path} ({len(data):,} rows, weeks "
+               f"{int(data['week'].min())}-{int(data['week'].max())})")
+    latest = pd.to_datetime(data["snapshot_dt"], errors="coerce").max()
+    if pd.notna(latest):
+        summary += f", newest snapshot {latest:%Y-%m-%d %H:%M} UTC"
+    return summary
+
+
+def main() -> None:
     for season in seasons(START_YEAR, END_YEAR, __doc__):
         try:
-            data = fetch_season(season)
+            print(save_season(season))
         except Exception as exc:
             print(f"{season}: fetch failed ({type(exc).__name__}: {exc}); skipping.")
-            continue
-
-        if data.empty:
-            print(f"{season}: no depth chart rows returned; skipping.")
-            continue
-
-        output_path = OUTPUT_DIR / f"depth_chart_{season}.csv"
-        data.to_csv(output_path, index=False, encoding="utf-8")
-        print(f"Saved {output_path} ({len(data):,} rows, weeks "
-              f"{int(data['week'].min())}-{int(data['week'].max())})")
 
 
 if __name__ == "__main__":

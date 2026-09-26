@@ -16,8 +16,11 @@ changed. See SEASON_FORM_NOTES for what is and is not refreshed.
 """
 
 import argparse
+import itertools
 import json
 import pickle
+import sys
+import time
 from datetime import date
 from pathlib import Path
 
@@ -26,9 +29,13 @@ import pandas as pd
 
 from processing.layer3_player_features import (
     MIN_CARRIES_FOR_YPC,
+    MIN_TARGETS_FOR_RATE,
+    REC_RATE_SHRINKAGE_GAMES,
+    REC_VOLUME_SHRINKAGE_GAMES,
     RECENT_GAMES,
     RUSH_VOLUME_SHRINKAGE_GAMES,
     RUSH_YARDS_SHRINKAGE_GAMES,
+    TEAM_PASS_SHRINKAGE_GAMES,
 )
 
 PROJECT_DIR = Path(__file__).resolve().parent
@@ -78,6 +85,42 @@ TREND_SHRINKAGE_GAMES = 6.0
 
 # Layer 3 clips the trend ratios to this floor.
 TREND_FLOOR = 0.1
+
+# The depth chart feed publishes a new snapshot about twice a day. A local copy
+# older than this is re-fetched before projecting, so the label the models see
+# is today's, not the one from last week's kickoff.
+DEPTH_REFRESH_HOURS = 12
+REFRESH_DEPTH_CHART = True
+
+# The positions whose projections re-weight draft pedigree and depth chart role
+# below. The models themselves are untouched: both are handled by averaging
+# model outputs over alternative values of the feature (see mixture_predict).
+ROLE_BLEND_POSITIONS = ("WR", "RB")
+
+# Draft slot is a talent prior for a player with no NFL tape. Each season in
+# the league cuts its pull to a quarter of the season before: full weight as a
+# rookie, 25% in year two, 6% in year three. The remaining weight goes to the
+# position's spread of draft slots, so a veteran is projected as if his draft
+# slot were unknown and his game log has to carry him.
+DRAFT_WEIGHT_DECAY = 0.25
+DRAFT_REFERENCE_QUANTILES = np.linspace(0.05, 0.95, 10)
+
+# The depth chart label is blended with the role this season's usage implies
+# (rank in targets per game among the team's players at the position, carries
+# plus targets for backs). The label keeps weight
+#     DEPTH_CHART_FLOOR + (1 - DEPTH_CHART_FLOOR) * k / (k + n)
+# with n games played: all of it before week 1, 68% after one game, 47% after
+# three, 40% after six, never below 25%. k = 1.5 was fit on 2025 (the first
+# season in the snapshot chart schema 2026 uses) by regressing rest-of-season
+# PPR per game on the tier means of each signal after n games; the floor was
+# fixed at 0.25, where the 2016-2024 and 2025 fits for backs agreed. The
+# formation-based 2016-2024 charts favor usage even more (label weight 0.15-0.25).
+DEPTH_CHART_FLOOR = 0.25
+DEPTH_CHART_SHRINKAGE_GAMES = 1.5
+
+# Same encoding as data_fetching/fetch_depth_charts.encode_depth.
+ROLE_SCORES = {1: 1.0, 2: 0.5, 3: 0.2}
+ROLE_SCORE_DEEP = 0.1
 
 # The RB stats whose models read target share as a proxy for role. For these,
 # receiving work may lift the projection but a thin share may not sink it.
@@ -161,6 +204,14 @@ def blend(current: float | None, prior: float | None, weight: float) -> float | 
     if prior is None:
         return current
     return weight * current + (1.0 - weight) * prior
+
+
+def depth_chart_weight(games: int | None) -> float:
+    """How much the depth chart label counts against the usage-implied role."""
+    if not games:
+        return 1.0
+    fade = DEPTH_CHART_SHRINKAGE_GAMES / (DEPTH_CHART_SHRINKAGE_GAMES + games)
+    return DEPTH_CHART_FLOOR + (1.0 - DEPTH_CHART_FLOOR) * fade
 
 
 def shrink_ratio(ratio: float | None, weight: float) -> float | None:
@@ -274,6 +325,10 @@ class SeasonForm:
         self.injuries = injuries
 
         self.depth_chart, self.depth_week = self._latest_depth_chart()
+        self.depth_snapshot = None
+        if "snapshot_dt" in self.depth_chart.columns:
+            stamp = pd.to_datetime(self.depth_chart["snapshot_dt"], errors="coerce").max()
+            self.depth_snapshot = None if pd.isna(stamp) else stamp
         self.oline = self._oline_ranks(OLINE_PATH, lambda week: week < target_week)
         self.prior_oline = self._oline_ranks(PRIOR_OLINE_PATH, lambda week: week.notna())
         self.bye_weeks = self._bye_weeks(schedule)
@@ -444,6 +499,78 @@ class SeasonForm:
                                           "carry_share_of_team", "carries_last3") if column in values)
         return values, f"{detail} ({games} {TARGET_SEASON} game(s) + {last_games} {CONTEXT_SEASON})"
 
+    def receiving_features(self, player_id, name: str, team: str) -> tuple[dict[str, float], str | None]:
+        """Layer 3's receiving volume, efficiency and team pass volume as of the target week.
+
+        Same construction as rushing_features: this season through last week,
+        shrunk toward the player's full previous season (the team's, for pass
+        attempts) with the constants Layer 3 was fit with.
+        """
+        values: dict[str, float] = {}
+        details = []
+
+        # Team pass attempts belong to the team, so they are set for every player.
+        team_now = self.box[self.box["team"] == team] if self.has_data() else pd.DataFrame()
+        team_before = (self.prior_full_box[self.prior_full_box["team"] == team]
+                       if not self.prior_full_box.empty else pd.DataFrame())
+        team_games = int(team_now["week"].nunique()) if not team_now.empty else 0
+        last_team_games = int(team_before["week"].nunique()) if not team_before.empty else 0
+        attempts_pg = blend(
+            safe_ratio(float(team_now["attempts"].fillna(0.0).sum()), team_games) if team_games else None,
+            safe_ratio(float(team_before["attempts"].fillna(0.0).sum()), last_team_games) if last_team_games else None,
+            in_season_weight(team_games, TEAM_PASS_SHRINKAGE_GAMES))
+        if attempts_pg is not None:
+            values["team_pass_att_per_game"] = attempts_pg
+            details.append(f"team pass att/g {attempts_pg:.1f}")
+
+        now = self._player_rows(self.box, player_id, name) if self.has_data() else pd.DataFrame()
+        before = self._player_rows(self.prior_full_box, player_id, name)
+        if now.empty and before.empty:
+            return values, ", ".join(details) or None
+
+        def total(rows: pd.DataFrame, column: str) -> float:
+            return float(rows[column].fillna(0.0).sum()) if not rows.empty else 0.0
+
+        games, last_games = len(now), len(before)
+
+        def shrink(current: float | None, prior: float | None, k: float) -> float | None:
+            return blend(current if games else None, prior, games / (games + k) if games else 0.0)
+
+        targets, last_targets = total(now, "targets"), total(before, "targets")
+        team_air = total(team_now, "receiving_air_yards")
+        last_team_air = None
+        if last_games:
+            last_team = before.sort_values("week")["team"].iloc[-1]
+            last_team_air = total(self.prior_full_box[self.prior_full_box["team"] == last_team],
+                                  "receiving_air_yards")
+
+        for column, stat in (("targets_per_game", "targets"), ("rec_yds_per_game", "receiving_yards")):
+            value = shrink(safe_ratio(total(now, stat), games), safe_ratio(total(before, stat), last_games),
+                           REC_VOLUME_SHRINKAGE_GAMES)
+            if value is not None:
+                values[column] = value
+        air_share = shrink(safe_ratio(total(now, "receiving_air_yards"), team_air),
+                           safe_ratio(total(before, "receiving_air_yards"), last_team_air) if last_team_air else None,
+                           REC_VOLUME_SHRINKAGE_GAMES)
+        if air_share is not None:
+            values["player_air_yards_share"] = air_share
+
+        if targets + last_targets >= MIN_TARGETS_FOR_RATE:
+            for column, stat in (("yds_per_target", "receiving_yards"), ("catch_rate", "receptions"),
+                                 ("air_yds_per_target", "receiving_air_yards"), ("td_per_target", "receiving_tds")):
+                value = shrink(safe_ratio(total(now, stat), targets), safe_ratio(total(before, stat), last_targets),
+                               REC_RATE_SHRINKAGE_GAMES[column])
+                if value is not None:
+                    values[column] = value
+
+        formats = (("targets_per_game", "tgt/g", ".1f"), ("rec_yds_per_game", "yd/g", ".1f"),
+                   ("yds_per_target", "yd/tgt", ".2f"), ("catch_rate", "catch", ".0%"),
+                   ("air_yds_per_target", "aDOT", ".1f"), ("td_per_target", "TD/tgt", ".3f"),
+                   ("player_air_yards_share", "air share", ".1%"))
+        details = [f"{label} {values[column]:{spec}}" for column, label, spec in formats
+                   if column in values] + details
+        return values, f"{', '.join(details)} ({games} {TARGET_SEASON} game(s) + {last_games} {CONTEXT_SEASON})"
+
     def depth_score(self, player_id, name: str, position: str) -> tuple[float, str]:
         if self.depth_chart.empty:
             return DEPTH_SCORE_UNKNOWN, f"no {DEPTH_CHART_PATH.name}"
@@ -456,7 +583,40 @@ class SeasonForm:
         chosen = (exact if not exact.empty else rows).sort_values("depth_chart_rank")
         rank = chosen.iloc[0]["depth_chart_rank"]
         score = float(chosen.iloc[0]["depth_chart_position"])
-        return score, f"{position}{int(rank)} on week {self.depth_week} chart"
+        source = f"{position}{int(rank)} on week {self.depth_week} chart"
+        if self.depth_snapshot is not None:
+            source += f", snapshot {self.depth_snapshot:%b %d %H:%M} UTC"
+        return score, source
+
+    def usage_role(self, player_id, name: str, team: str, position: str) -> tuple[float, str] | None:
+        """The depth tier this season's usage implies, through last week.
+
+        Rank in opportunities per game played among the team's players at the
+        position: targets for receivers, carries plus targets for backs. Ties go
+        to the player, and only games for his current team count.
+        """
+        if not self.has_data() or "position" not in self.box.columns:
+            return None
+        rows = self._player_rows(self.box, player_id, name)
+        rows = rows[rows["team"] == team]
+        if rows.empty:
+            return None
+
+        group = self.box[(self.box["team"] == team)
+                         & (self.box["position"].astype("string").str.upper() == position)]
+        group = pd.concat([group, rows]).drop_duplicates(subset=["player_id", "week"])
+        opportunities = group["targets"].fillna(0.0)
+        label = "tgt"
+        if position == "RB":
+            opportunities = opportunities + group["carries"].fillna(0.0)
+            label = "car+tgt"
+        per_game = opportunities.groupby(group["player_id"]).mean()
+
+        mine = float(per_game[rows["player_id"].iloc[0]])
+        rank = int((per_game > mine).sum()) + 1
+        score = ROLE_SCORES.get(rank, ROLE_SCORE_DEEP)
+        return score, (f"{position}{rank} by {TARGET_SEASON} usage ({mine:.1f} {label}/g, "
+                       f"of {len(per_game)} {team} {position}s)")
 
     @staticmethod
     def _player_rows_by_name(frame: pd.DataFrame, player_id, name: str) -> pd.DataFrame:
@@ -590,6 +750,31 @@ def peer_target_share(training: pd.DataFrame, position: str, depth_score: float)
     return float(shares.median()) if len(shares) else None
 
 
+def draft_reference_values(training: pd.DataFrame, position: str) -> list[float]:
+    """Deciles of the position's draft slots, one value per player.
+
+    Undrafted players count as 0, the value train.py's zero-fill gives them, so
+    this is the distribution the models actually saw.
+    """
+    peers = training[training["bio_position"] == position]
+    if peers.empty or "bio_draft_number" not in peers.columns:
+        return []
+    slots = peers.groupby("player_id")["bio_draft_number"].last().fillna(0.0)
+    return [float(v) for v in np.quantile(slots, DRAFT_REFERENCE_QUANTILES, method="lower")]
+
+
+def draft_weight(bio: pd.Series) -> tuple[float, int | None]:
+    """(weight on the player's own draft slot, NFL seasons before this one)."""
+    first = next((bio.get(c) for c in ("rookie_year", "entry_year") if pd.notna(bio.get(c))), None)
+    if first is not None:
+        seasons = max(0, TARGET_SEASON - int(first))
+    elif pd.notna(bio.get("years_exp")):
+        seasons = max(0, int(bio.get("years_exp")))
+    else:
+        return 1.0, None
+    return DRAFT_WEIGHT_DECAY ** seasons, seasons
+
+
 def build_overrides(game: pd.Series, is_home: bool, bio: pd.Series, team: str, position: str,
                     week: int, oc: pd.Series | None, sos: pd.Series | None,
                     team_def: pd.Series | None, opp_def: pd.Series | None,
@@ -655,6 +840,11 @@ def build_overrides(game: pd.Series, is_home: bool, bio: pd.Series, team: str, p
     values.update(rushing)
     if rushing_detail:
         notes["rushing"] = rushing_detail
+
+    receiving, receiving_detail = form.receiving_features(player_id, player_name, team)
+    values.update(receiving)
+    if receiving_detail:
+        notes["receiving"] = receiving_detail
 
     oline = form.oline_rank(team)
     if oline is not None:
@@ -732,6 +922,49 @@ def assemble_vector(feature_cols: list[str], context: pd.Series, overrides: dict
     return np.asarray(raw, dtype="float64"), defaulted
 
 
+def expand_vector(vector: np.ndarray, feature_cols: list[str],
+                  choices: dict[str, list[tuple[float, float]]]) -> list[tuple[float, np.ndarray]]:
+    """Every combination of the weighted alternative values, with its joint weight."""
+    columns = [c for c in choices if c in feature_cols]
+    mixes = []
+    for combo in itertools.product(*(choices[c] for c in columns)):
+        variant = vector.copy()
+        weight = 1.0
+        for column, (option_weight, value) in zip(columns, combo):
+            variant[feature_cols.index(column)] = value
+            weight *= option_weight
+        if weight > 0:
+            mixes.append((weight, variant))
+    return mixes
+
+
+def mixture_predict(model, mixes: list[tuple[float, np.ndarray]], normalize) -> float:
+    """Weighted average of one model's predictions over alternative input vectors."""
+    weights = np.asarray([w for w, _ in mixes])
+    batch = np.vstack([normalize(v) for _, v in mixes])
+    return float(weights @ model.predict(batch) / weights.sum())
+
+
+def refresh_depth_chart() -> str | None:
+    """Re-fetch this season's depth chart if the saved copy is stale.
+
+    Safe for backtests too: the fetcher gives each week the last snapshot before
+    its first kickoff, so a fresh download changes only the upcoming week.
+    """
+    if not REFRESH_DEPTH_CHART:
+        return None
+    if DEPTH_CHART_PATH.exists():
+        age_hours = (time.time() - DEPTH_CHART_PATH.stat().st_mtime) / 3600
+        if age_hours < DEPTH_REFRESH_HOURS:
+            return None
+    try:
+        sys.path.insert(0, str(PROJECT_DIR / "data_fetching"))
+        from fetch_depth_charts import save_season
+        return save_season(TARGET_SEASON)
+    except Exception as exc:
+        return f"failed ({type(exc).__name__}: {exc}); using the saved copy"
+
+
 def load_models(position_meta: dict) -> dict:
     models = {}
     for stat, info in position_meta.items():
@@ -790,6 +1023,7 @@ def predict(name: str, requested_week: int | None = None, today: date | None = N
     context, context_source = player_context_row(training, player.get("player_id"), player_name,
                                                  position, feature_cols)
 
+    refreshed = refresh_depth_chart()
     form = SeasonForm(week, schedule)
 
     oc = lookup_row(load_csv(OC_PATH, f"{TARGET_SEASON} coordinator data"), "team", team)
@@ -854,16 +1088,47 @@ def predict(name: str, requested_week: int | None = None, today: date | None = N
         notes["rb_floor"] = ("floored " + ", ".join(floored) if floored
                              else "share and trend at or above neutral, no floor needed")
 
+    # Draft slot and depth chart label are re-weighted by averaging the models
+    # over alternative values of each, not by editing the value itself: the
+    # trees split these features into steps, so a value between two tiers would
+    # just land on one side of a split.
+    choices: dict[str, list[tuple[float, float]]] = {}
+    if position in ROLE_BLEND_POSITIONS:
+        chart_weight = depth_chart_weight(games)
+        role = form.usage_role(player.get("player_id"), player_name, team, position)
+        if role is not None and chart_weight < 1.0:
+            role_score, notes["role"] = role
+            choices["depth_chart_position"] = [(chart_weight, depth_score), (1.0 - chart_weight, role_score)]
+            notes["role"] += f"; chart label weight {chart_weight:.0%}, usage role {1 - chart_weight:.0%}"
+        else:
+            notes["role"] = f"no {TARGET_SEASON} usage yet; chart label weight 100%"
+
+        own_weight, seasons = draft_weight(player)
+        references = draft_reference_values(training, position)
+        if "bio_draft_number" in feature_cols and references and own_weight < 1.0:
+            own_slot = raw_vector[feature_cols.index("bio_draft_number")]
+            choices["bio_draft_number"] = ([(own_weight, own_slot)]
+                                           + [((1.0 - own_weight) / len(references), v) for v in references])
+        slot = player.get("draft_number")
+        slot_text = f"pick #{int(slot)}" if pd.notna(slot) else "undrafted"
+        season_text = ("rookie" if seasons == 0
+                       else f"{seasons} prior NFL season(s)" if seasons else "tenure unknown")
+        notes["draft"] = f"{slot_text}, {season_text}: own slot weight {own_weight:.0%}"
+        if own_weight < 1.0:
+            notes["draft"] += f", rest averaged over {CONTEXT_SEASON} {position} draft slots"
+
     def normalize(vector: np.ndarray) -> np.ndarray:
         return ((vector - np.asarray(scaler_mean)) / np.asarray(scaler_scale)).reshape(1, -1)
 
     models = load_models(position_meta)
     predictions = {}
     lifted = []
+    base_mix = expand_vector(raw_vector, feature_cols, choices)
+    rushing_mix = expand_vector(rushing_vector, feature_cols, choices) if rushing_vector is not None else None
     for stat, model in models.items():
-        value = float(model.predict(normalize(raw_vector))[0])
-        if rushing_vector is not None and stat in RB_RUSHING_STATS:
-            floored_value = float(model.predict(normalize(rushing_vector))[0])
+        value = mixture_predict(model, base_mix, normalize)
+        if rushing_mix is not None and stat in RB_RUSHING_STATS:
+            floored_value = mixture_predict(model, rushing_mix, normalize)
             if floored_value > value:
                 lifted.append(f"{stat} +{floored_value - value:.1f}")
                 value = floored_value
@@ -890,11 +1155,14 @@ def predict(name: str, requested_week: int | None = None, today: date | None = N
     print(f"[form: {form.summary()}; {games} game(s) played, {TARGET_SEASON} weight {weight:.0%}; "
           f"depth: {depth_source} ({depth_score:.2f})]")
     print(f"[target share: {share_text} ({share_basis})]")
-    for key, label in (("trends", "trends"), ("rushing", "rushing form"), ("oline", "o-line rank"),
-                       ("rb_floor", "RB floor")):
+    for key, label in (("role", "role"), ("draft", "draft"), ("trends", "trends"),
+                       ("rushing", "rushing form"), ("receiving", "receiving form"),
+                       ("oline", "o-line rank"), ("rb_floor", "RB floor")):
         if key in notes:
             print(f"[{label}: {notes[key]}]")
     print(f"[context: {context_source}; {len(defaulted)} of {len(feature_cols)} features unavailable]")
+    if refreshed:
+        print(f"[depth chart refresh: {refreshed}]")
     print(f"[note: {SEASON_FORM_NOTES}]")
 
 
@@ -905,12 +1173,16 @@ def main() -> None:
     parser.add_argument("name", nargs="+", help="player name, e.g. \"Ja'Marr Chase\"")
     parser.add_argument("-w", "--week", type=int, metavar="N",
                         help=f"{TARGET_SEASON} regular-season week to project (default: next unplayed)")
+    parser.add_argument("--no-refresh", action="store_true",
+                        help=f"use the saved depth chart even if it is over {DEPTH_REFRESH_HOURS}h old")
     parser.add_argument("--model-dir", type=Path, metavar="DIR",
                         help="load models from DIR instead of model/, e.g. a candidate from train.py --model-dir")
     args = parser.parse_args()
 
+    global MODEL_DIR, METADATA_PATH, REFRESH_DEPTH_CHART
+    if args.no_refresh:
+        REFRESH_DEPTH_CHART = False
     if args.model_dir is not None:
-        global MODEL_DIR, METADATA_PATH
         MODEL_DIR = args.model_dir.resolve()
         METADATA_PATH = MODEL_DIR / "model_metadata.json"
 

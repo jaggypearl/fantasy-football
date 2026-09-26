@@ -106,6 +106,19 @@ ID_COLS = {
     "game_id",
 }
 
+# Layer 3's receiving volume and efficiency features. Over four seeds on the 2025
+# test season they cut WR and TE PPR MAE by about 0.04 each, on every seed, but
+# left QB and RB no better (+0.03 on average, within seed noise), so those two
+# positions train without them.
+RECEIVING_FORM_FEATURES = [
+    "targets_per_game", "rec_yds_per_game", "player_air_yards_share", "yds_per_target",
+    "catch_rate", "air_yds_per_target", "td_per_target", "team_pass_att_per_game",
+]
+POSITION_EXCLUDED_FEATURES = {
+    "QB": RECEIVING_FORM_FEATURES,
+    "RB": RECEIVING_FORM_FEATURES,
+}
+
 HYPERPARAMS = {
     "max_depth": 6,
     "learning_rate": 0.1,
@@ -203,6 +216,8 @@ def train_position(df: pd.DataFrame, position: str, feature_cols: list[str],
                    model_dir: Path = MODEL_DIR) -> tuple[dict, dict]:
     subset = df[df["bio_position"] == position]
     train_df, val_df, test_df = split_by_season(subset)
+    excluded = POSITION_EXCLUDED_FEATURES.get(position, [])
+    feature_cols = [c for c in feature_cols if c not in excluded]
 
     print("\n" + "=" * 80)
     print(f"POSITION: {position}")

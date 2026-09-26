@@ -24,8 +24,9 @@ re-downloading the rest: `python data_fetching/fetch_play_by_play.py --years 202
 - [x] Play-by-play / target share — 2010–2026 (2026 through week 2, 5,489 plays)
 - [x] Next Gen Stats (NGS) — 2016–2026 (2026 through week 2)
     - covers passing, rushing, and receiving via `nfl_data_py.import_ngs_data`, saved to separate subfolders under `data/raw/ngs/`
-- [x] Depth charts — 2010–2026 (2026 through week 2)
-    - a week's chart is the last snapshot published on or before that week's first kickoff, so the upcoming week has no chart until its own game week opens
+- [x] Depth charts — 2010–2026 (2026 through the upcoming week)
+    - a week's chart is the last snapshot published before that week's first kickoff (by game time, not date). The one week that has not kicked off yet gets the newest snapshot. The feed publishes about twice a day, and `prediction.py` re-fetches the 2026 file when it is over 12h old (`--no-refresh` to skip)
+    - the old rule skipped the upcoming week, so week-3 projections fell back to the week-2 chart and missed JAX moving Parker Washington to WR1 on Sep 21
 - [x] O-line rankings (weekly) — 2010–2026 (2026 through week 2, derived from play-by-play)
 - [x] Strength of schedule — 2010–2026 (2026 `adjusted_sos` now real, but off a 2-game sample)
 - [~] Offensive coordinators — 2010–2026

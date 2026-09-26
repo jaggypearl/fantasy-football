@@ -210,6 +210,119 @@ def build_rushing_features(result: pd.DataFrame) -> pd.DataFrame:
     return result
 
 
+# Receiving form uses the same n / (n + k) shrinkage toward last season, n being
+# games played before this week. Each k is the one that best predicted a WR/TE's
+# rest-of-season value from his first 1-6 games of 2016-2025 (prior season of
+# 20+ targets, errors weighted by rest-of-season targets or games). Volume
+# settles quickly; the per-target rates are mostly noise over a few games and
+# lean on last season for most of the year (two games count 14% at k = 12).
+REC_VOLUME_SHRINKAGE_GAMES = 4.0    # targets and receiving yards per game, air yards share
+REC_RATE_SHRINKAGE_GAMES = {
+    "yds_per_target": 12.0,
+    "catch_rate": 12.0,
+    "air_yds_per_target": 8.0,
+    "td_per_target": 16.0,
+}
+TEAM_PASS_SHRINKAGE_GAMES = 6.0     # team pass attempts per game, fit on team-seasons
+
+# The per-target rates are left NaN until the targets behind them reach this many.
+MIN_TARGETS_FOR_RATE = 10.0
+
+# Per-target rates: (feature, numerator column in the frame below).
+REC_RATES = (
+    ("yds_per_target", "_yards"),
+    ("catch_rate", "_rec"),
+    ("air_yds_per_target", "_air"),
+    ("td_per_target", "_tds"),
+)
+
+
+def build_receiving_features(result: pd.DataFrame) -> pd.DataFrame:
+    """Receiving volume, efficiency and team pass volume from games before this one.
+
+    Target share says how much of the passing game a player gets; these say what
+    he does with it (yards, catches, depth and touchdowns per target) and how
+    big that passing game is. Built like the rushing features: cumulative
+    through last week, shrunk toward the player's own previous season, with
+    team pass attempts shrunk toward the team's previous season.
+    """
+    result = result.sort_values(["player_id", "season", "week"]).reset_index(drop=True)
+
+    played = (result["dnp_flag"] == 0).astype(float)
+    frame = pd.DataFrame({"player_id": result["player_id"], "season": result["season"],
+                          "team": result["team"], "week": result["week"], "_played": played})
+    for column, source in (("_targets", "targets"), ("_rec", "receptions"), ("_yards", "receiving_yards"),
+                           ("_tds", "receiving_tds"), ("_air", "receiving_air_yards")):
+        frame[column] = result[source].fillna(0.0) * played
+    frame["_attempts"] = result["attempts"].fillna(0.0)
+
+    team_week = (
+        frame.groupby(["season", "team", "week"], dropna=False)[["_air", "_attempts"]].sum()
+        .reset_index().rename(columns={"_air": "_team_air", "_attempts": "_team_att"})
+        .sort_values(["season", "team", "week"])
+    )
+    team_grouped = team_week.groupby(["season", "team"])
+    team_week["_team_air_before"] = team_grouped["_team_air"].cumsum() - team_week["_team_air"]
+    team_week["_team_att_before"] = team_grouped["_team_att"].cumsum() - team_week["_team_att"]
+    team_week["_team_games_before"] = team_grouped.cumcount().astype(float)
+
+    team_season = team_week.groupby(["season", "team"], as_index=False).agg(
+        _last_team_air=("_team_air", "sum"), _last_team_att=("_team_att", "sum"),
+        _last_team_games=("_team_att", "size"))
+    team_season["_last_team_att_pg"] = safe_ratio(team_season["_last_team_att"], team_season["_last_team_games"])
+
+    # Team pass volume belongs to the team, so last season means this team's
+    # last season, whoever the player played for.
+    own_last = team_season[["season", "team", "_last_team_att_pg"]].copy()
+    own_last["season"] = own_last["season"] + 1
+    team_week = team_week.merge(own_last, on=["season", "team"], how="left")
+    team_week["team_pass_att_per_game"] = shrink_toward_prior(
+        safe_ratio(team_week["_team_att_before"], team_week["_team_games_before"]),
+        team_week["_last_team_att_pg"], team_week["_team_games_before"], TEAM_PASS_SHRINKAGE_GAMES)
+    frame = frame.merge(team_week[["season", "team", "week", "_team_air_before", "team_pass_att_per_game"]],
+                        on=["season", "team", "week"], how="left")
+
+    stats = ["_played", "_targets", "_rec", "_yards", "_tds", "_air"]
+    grouped = frame.groupby(["player_id", "season"])
+    before = grouped[stats].cumsum() - frame[stats]
+
+    # Last season's player totals; air yards share divides by the full-season
+    # total of the team he finished with, as carry share does.
+    last = frame.groupby(["player_id", "season"], as_index=False).agg(
+        **{f"_last{c}": (c, "sum") for c in stats}, _last_team=("team", "last"))
+    last = last.merge(
+        team_season[["season", "team", "_last_team_air"]].rename(columns={"team": "_last_team"}),
+        on=["season", "_last_team"], how="left")
+    last["season"] = last["season"] + 1
+    last = frame[["player_id", "season"]].merge(last, on=["player_id", "season"], how="left")
+
+    games = before["_played"]
+    targets_pg = shrink_toward_prior(
+        safe_ratio(before["_targets"], games), safe_ratio(last["_last_targets"], last["_last_played"]),
+        games, REC_VOLUME_SHRINKAGE_GAMES)
+    yards_pg = shrink_toward_prior(
+        safe_ratio(before["_yards"], games), safe_ratio(last["_last_yards"], last["_last_played"]),
+        games, REC_VOLUME_SHRINKAGE_GAMES)
+    air_share = shrink_toward_prior(
+        safe_ratio(before["_air"], frame["_team_air_before"]),
+        safe_ratio(last["_last_air"], last["_last_team_air"]),
+        games, REC_VOLUME_SHRINKAGE_GAMES)
+
+    pooled_targets = before["_targets"] + last["_last_targets"].fillna(0.0)
+    for feature, numerator in REC_RATES:
+        rate = shrink_toward_prior(
+            safe_ratio(before[numerator], before["_targets"]),
+            safe_ratio(last[f"_last{numerator}"], last["_last_targets"]),
+            games, REC_RATE_SHRINKAGE_GAMES[feature])
+        result[feature] = rate.where(pooled_targets >= MIN_TARGETS_FOR_RATE)
+
+    result["targets_per_game"] = targets_pg
+    result["rec_yds_per_game"] = yards_pg
+    result["player_air_yards_share"] = air_share
+    result["team_pass_att_per_game"] = frame["team_pass_att_per_game"]
+    return result
+
+
 def load_depth_charts() -> pd.DataFrame:
     paths = sorted(DEPTH_CHART_DIR.glob("depth_chart_*.csv"))
     if not paths:
@@ -375,6 +488,7 @@ def main() -> None:
     result = build_matchup_features(result, team_aggs)
     result = build_usage_trend_features(result)
     result = build_rushing_features(result)
+    result = build_receiving_features(result)
     result = build_depth_chart_features(result)
     result = build_player_target_share(result)
     result = build_seasonal_context_features(result)
@@ -401,6 +515,8 @@ def main() -> None:
         "depth_chart_position", "player_target_share_of_team",
         "carries_per_game", "rush_yds_per_game", "yards_per_carry", "carry_share_of_team",
         "carries_last3",
+        "targets_per_game", "rec_yds_per_game", "player_air_yards_share", "yds_per_target",
+        "catch_rate", "air_yds_per_target", "td_per_target", "team_pass_att_per_game",
     ]
 
     expected_ranges = {
@@ -420,6 +536,14 @@ def main() -> None:
         "yards_per_carry": (-5, 15),
         "carry_share_of_team": (0, 1),
         "carries_last3": (0, 45),
+        "targets_per_game": (0, 20),
+        "rec_yds_per_game": (-10, 200),
+        "player_air_yards_share": (-0.2, 1),
+        "yds_per_target": (-5, 30),
+        "catch_rate": (0, 1),
+        "air_yds_per_target": (-10, 40),
+        "td_per_target": (0, 1),
+        "team_pass_att_per_game": (15, 55),
     }
 
     for col in new_cols:
@@ -454,6 +578,8 @@ def main() -> None:
     print("  usage_trend/target_share_trend nulls expected in week 1 (no prior weeks), for rookies, and for players with no prior-season data.")
     print("  rushing feature nulls expected for a rookie's first game; yards_per_carry is null under "
           f"{MIN_CARRIES_FOR_YPC:.0f} carries.")
+    print("  receiving rate nulls (yds_per_target, catch_rate, air_yds_per_target, td_per_target) "
+          f"expected under {MIN_TARGETS_FOR_RATE:.0f} targets, this season plus last.")
     print("  opp_def_strength_for_position/matchup_advantage_score nulls expected for non-RB/WR/TE/QB positions.")
     print("  bye_week_passed nulls expected when a team's bye week could not be determined from the data.")
 
