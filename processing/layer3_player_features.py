@@ -24,6 +24,33 @@ def safe_ratio(numer: pd.Series, denom: pd.Series) -> pd.Series:
     return numer / denom.replace(0, np.nan)
 
 
+def team_totals_when_played(frame: pd.DataFrame, columns: list[str]) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """The team's totals of `columns`, counted only over the weeks the player played.
+
+    Returns (before, last), aligned to frame: this season through last week, and
+    all of last season. Each week counts the team the player was on that week,
+    so a trade is followed. A share built on these is a share of the games the
+    player was on the field for; weeks he missed do not dilute it.
+
+    frame needs player_id, season, team, week, _played and the columns, with the
+    columns already zeroed on weeks the player did not play.
+    """
+    keys = ["season", "team", "week"]
+    team_week = frame.groupby(keys, dropna=False)[columns].sum().reset_index()
+    weekly = frame[keys].merge(team_week, on=keys, how="left")[columns]
+    weekly.index = frame.index
+    weekly = weekly.fillna(0.0).mul(frame["_played"], axis=0)
+
+    by_player = [frame["player_id"], frame["season"]]
+    before = weekly.groupby(by_player).cumsum() - weekly
+
+    season = weekly.groupby(by_player).sum().reset_index()
+    season["season"] = season["season"] + 1
+    last = frame[["player_id", "season"]].merge(season, on=["player_id", "season"], how="left")[columns]
+    last.index = frame.index
+    return before, last
+
+
 def build_matchup_features(result: pd.DataFrame, team_aggs: pd.DataFrame) -> pd.DataFrame:
     long_def = team_aggs.melt(
         id_vars=["season", "team"],
@@ -62,18 +89,19 @@ def build_matchup_features(result: pd.DataFrame, team_aggs: pd.DataFrame) -> pd.
 
 
 def build_usage_trend_features(result: pd.DataFrame) -> pd.DataFrame:
-    """This season's usage and average target share over the weeks before this one,
-    divided by the same span of last season.
+    """This season's usage per game and average target share over the weeks before
+    this one, divided by the same span of last season.
 
     Both sides stop at week - 1, so the game being predicted never feeds its own
     trend. Last season's side is looked up as-of week - 1 rather than joined on
     the exact week, so a bye or missed week last season no longer blanks the row.
+    Both are per game played, so missed games read as missed, not as lost role.
     Week 1 has no prior weeks and is NaN.
     """
     result = result.sort_values(["player_id", "season", "week"]).reset_index(drop=True)
 
-    result["_usage"] = result["targets"].fillna(0.0) + result["carries"].fillna(0.0)
     result["_played"] = (result["dnp_flag"] == 0).astype(float)
+    result["_usage"] = (result["targets"].fillna(0.0) + result["carries"].fillna(0.0)) * result["_played"]
     result["_share"] = result["target_share"].fillna(0.0) * result["_played"]
 
     grouped = result.groupby(["player_id", "season"])
@@ -97,9 +125,9 @@ def build_usage_trend_features(result: pd.DataFrame) -> pd.DataFrame:
     matched = pd.merge_asof(keys, last, on="week", by=["player_id", "season"], direction="backward")
     matched = matched.set_index("_row").reindex(np.arange(len(result)))
 
-    usage_now = before["_cum_usage"]
+    usage_now = safe_ratio(before["_cum_usage"], before["_cum_played"])
     share_now = safe_ratio(before["_cum_share"], before["_cum_played"])
-    usage_then = matched["_last_cum_usage"]
+    usage_then = safe_ratio(matched["_last_cum_usage"], matched["_last_cum_played"])
     share_then = safe_ratio(matched["_last_cum_share"], matched["_last_cum_played"])
 
     result["usage_trend"] = safe_ratio(usage_now, usage_then).where(before["_cum_played"] > 0)
@@ -145,35 +173,20 @@ def build_rushing_features(result: pd.DataFrame) -> pd.DataFrame:
                           "team": result["team"], "week": result["week"],
                           "_played": played, "_carries": carries, "_yards": yards})
 
-    team_week = (
-        frame.groupby(["season", "team", "week"], dropna=False)["_carries"].sum()
-        .reset_index().rename(columns={"_carries": "_team_carries"})
-        .sort_values(["season", "team", "week"])
-    )
-    team_week["_team_before"] = (
-        team_week.groupby(["season", "team"])["_team_carries"].cumsum() - team_week["_team_carries"]
-    )
-    frame = frame.merge(team_week, on=["season", "team", "week"], how="left")
-
     grouped = frame.groupby(["player_id", "season"])
     games_before = grouped["_played"].cumsum() - frame["_played"]
     carries_before = grouped["_carries"].cumsum() - frame["_carries"]
     yards_before = grouped["_yards"].cumsum() - frame["_yards"]
 
-    # Same denominators as build_player_target_share: this season, every team
-    # carry before this week; last season, the full-season total of the team
-    # the player finished with.
-    team_before = frame["_team_before"]
+    # Same denominators as build_player_target_share: team carries in the games
+    # the player played, before this week and over all of last season.
+    team_before, team_last = team_totals_when_played(frame, ["_carries"])
     last = frame.groupby(["player_id", "season"], as_index=False).agg(
         _last_games=("_played", "sum"), _last_carries=("_carries", "sum"),
-        _last_yards=("_yards", "sum"), _last_team=("team", "last"))
-    team_season = (
-        team_week.groupby(["season", "team"], as_index=False)["_team_carries"].sum()
-        .rename(columns={"team": "_last_team", "_team_carries": "_last_team_carries"})
-    )
-    last = last.merge(team_season, on=["season", "_last_team"], how="left")
+        _last_yards=("_yards", "sum"))
     last["season"] = last["season"] + 1
     last = frame[["player_id", "season"]].merge(last, on=["player_id", "season"], how="left")
+    last["_last_team_carries"] = team_last["_carries"].to_numpy()
 
     carries_pg = shrink_toward_prior(
         safe_ratio(carries_before, games_before),
@@ -184,7 +197,7 @@ def build_rushing_features(result: pd.DataFrame) -> pd.DataFrame:
         safe_ratio(last["_last_yards"], last["_last_games"]),
         games_before, RUSH_YARDS_SHRINKAGE_GAMES)
     carry_share = shrink_toward_prior(
-        safe_ratio(carries_before, team_before),
+        safe_ratio(carries_before, team_before["_carries"]),
         safe_ratio(last["_last_carries"], last["_last_team_carries"]),
         games_before, RUSH_VOLUME_SHRINKAGE_GAMES)
 
@@ -257,18 +270,16 @@ def build_receiving_features(result: pd.DataFrame) -> pd.DataFrame:
     frame["_attempts"] = result["attempts"].fillna(0.0)
 
     team_week = (
-        frame.groupby(["season", "team", "week"], dropna=False)[["_air", "_attempts"]].sum()
-        .reset_index().rename(columns={"_air": "_team_air", "_attempts": "_team_att"})
+        frame.groupby(["season", "team", "week"], dropna=False)["_attempts"].sum()
+        .reset_index().rename(columns={"_attempts": "_team_att"})
         .sort_values(["season", "team", "week"])
     )
     team_grouped = team_week.groupby(["season", "team"])
-    team_week["_team_air_before"] = team_grouped["_team_air"].cumsum() - team_week["_team_air"]
     team_week["_team_att_before"] = team_grouped["_team_att"].cumsum() - team_week["_team_att"]
     team_week["_team_games_before"] = team_grouped.cumcount().astype(float)
 
     team_season = team_week.groupby(["season", "team"], as_index=False).agg(
-        _last_team_air=("_team_air", "sum"), _last_team_att=("_team_att", "sum"),
-        _last_team_games=("_team_att", "size"))
+        _last_team_att=("_team_att", "sum"), _last_team_games=("_team_att", "size"))
     team_season["_last_team_att_pg"] = safe_ratio(team_season["_last_team_att"], team_season["_last_team_games"])
 
     # Team pass volume belongs to the team, so last season means this team's
@@ -279,22 +290,21 @@ def build_receiving_features(result: pd.DataFrame) -> pd.DataFrame:
     team_week["team_pass_att_per_game"] = shrink_toward_prior(
         safe_ratio(team_week["_team_att_before"], team_week["_team_games_before"]),
         team_week["_last_team_att_pg"], team_week["_team_games_before"], TEAM_PASS_SHRINKAGE_GAMES)
-    frame = frame.merge(team_week[["season", "team", "week", "_team_air_before", "team_pass_att_per_game"]],
+    frame = frame.merge(team_week[["season", "team", "week", "team_pass_att_per_game"]],
                         on=["season", "team", "week"], how="left")
 
     stats = ["_played", "_targets", "_rec", "_yards", "_tds", "_air"]
     grouped = frame.groupby(["player_id", "season"])
     before = grouped[stats].cumsum() - frame[stats]
 
-    # Last season's player totals; air yards share divides by the full-season
-    # total of the team he finished with, as carry share does.
+    # Last season's player totals; air yards share divides by the team's air
+    # yards in the games he played, as carry share does.
+    team_air_before, team_air_last = team_totals_when_played(frame, ["_air"])
     last = frame.groupby(["player_id", "season"], as_index=False).agg(
-        **{f"_last{c}": (c, "sum") for c in stats}, _last_team=("team", "last"))
-    last = last.merge(
-        team_season[["season", "team", "_last_team_air"]].rename(columns={"team": "_last_team"}),
-        on=["season", "_last_team"], how="left")
+        **{f"_last{c}": (c, "sum") for c in stats})
     last["season"] = last["season"] + 1
     last = frame[["player_id", "season"]].merge(last, on=["player_id", "season"], how="left")
+    last["_last_team_air"] = team_air_last["_air"].to_numpy()
 
     games = before["_played"]
     targets_pg = shrink_toward_prior(
@@ -304,7 +314,7 @@ def build_receiving_features(result: pd.DataFrame) -> pd.DataFrame:
         safe_ratio(before["_yards"], games), safe_ratio(last["_last_yards"], last["_last_played"]),
         games, REC_VOLUME_SHRINKAGE_GAMES)
     air_share = shrink_toward_prior(
-        safe_ratio(before["_air"], frame["_team_air_before"]),
+        safe_ratio(before["_air"], team_air_before["_air"]),
         safe_ratio(last["_last_air"], last["_last_team_air"]),
         games, REC_VOLUME_SHRINKAGE_GAMES)
 
@@ -370,42 +380,28 @@ def build_depth_chart_features(result: pd.DataFrame) -> pd.DataFrame:
 
 
 def build_player_target_share(result: pd.DataFrame) -> pd.DataFrame:
+    """The player's share of team targets in the games he played before this week.
+
+    Falls back to last season's share, also over the games he played, until he
+    has played a game this season.
+    """
     result = result.sort_values(["player_id", "season", "week"]).reset_index(drop=True)
-    result["_targets"] = result["targets"].fillna(0.0)
 
-    team_week = (
-        result.groupby(["season", "team", "week"], dropna=False)["_targets"].sum()
-        .reset_index().rename(columns={"_targets": "_team_targets"})
-        .sort_values(["season", "team", "week"])
-    )
-    team_week["_team_prior"] = (
-        team_week.groupby(["season", "team"])["_team_targets"].cumsum() - team_week["_team_targets"]
-    )
-    result = result.merge(team_week[["season", "team", "week", "_team_prior"]],
-                          on=["season", "team", "week"], how="left")
+    played = (result["dnp_flag"] == 0).astype(float)
+    frame = pd.DataFrame({"player_id": result["player_id"], "season": result["season"],
+                          "team": result["team"], "week": result["week"], "_played": played,
+                          "_targets": result["targets"].fillna(0.0) * played})
+    team_before, team_last = team_totals_when_played(frame, ["_targets"])
 
-    result = result.sort_values(["player_id", "season", "week"]).reset_index(drop=True)
-    grouped = result.groupby(["player_id", "season"])["_targets"]
-    result["_player_prior"] = grouped.cumsum() - result["_targets"]
-    in_season = safe_ratio(result["_player_prior"], result["_team_prior"])
+    player_before = frame.groupby(["player_id", "season"])["_targets"].cumsum() - frame["_targets"]
+    in_season = safe_ratio(player_before, team_before["_targets"])
 
-    player_season = result.groupby(["player_id", "season"], as_index=False)["_targets"].sum()
-    team_season = (
-        team_week.groupby(["season", "team"], as_index=False)["_team_targets"].sum()
-        .rename(columns={"_team_targets": "_team_season_targets"})
-    )
-    player_team = result[["player_id", "season", "team"]].drop_duplicates(subset=["player_id", "season"], keep="last")
-    player_season = player_season.merge(player_team, on=["player_id", "season"], how="left")
-    player_season = player_season.merge(team_season, on=["season", "team"], how="left")
-    player_season["_prior_season_share"] = safe_ratio(
-        player_season["_targets"], player_season["_team_season_targets"])
-    player_season["season"] = player_season["season"] + 1
+    last = frame.groupby(["player_id", "season"], as_index=False)["_targets"].sum()
+    last["season"] = last["season"] + 1
+    last = frame[["player_id", "season"]].merge(last, on=["player_id", "season"], how="left")
+    prior_season = safe_ratio(pd.Series(last["_targets"].to_numpy(), index=frame.index), team_last["_targets"])
 
-    result = result.merge(player_season[["player_id", "season", "_prior_season_share"]],
-                          on=["player_id", "season"], how="left")
-
-    result["player_target_share_of_team"] = in_season.fillna(result["_prior_season_share"])
-    result = result.drop(columns=["_targets", "_team_prior", "_player_prior", "_prior_season_share"])
+    result["player_target_share_of_team"] = in_season.fillna(prior_season)
     return result
 
 

@@ -391,6 +391,16 @@ class SeasonForm:
             rows = frame[frame["player_display_name"].str.casefold() == name.casefold()]
         return rows
 
+    @staticmethod
+    def _team_total_when_played(frame: pd.DataFrame, rows: pd.DataFrame, column: str) -> float:
+        """A team stat summed over the weeks in rows (one player's games), for the
+        team he was on each week. Mirrors Layer 3's team_totals_when_played."""
+        if frame.empty or rows.empty:
+            return 0.0
+        weekly = frame.groupby(["team", "week"])[column].sum()
+        keys = pd.MultiIndex.from_frame(rows[["team", "week"]])
+        return float(weekly.reindex(keys).fillna(0.0).sum())
+
     def games_played(self, player_id, name: str) -> int | None:
         if not self.has_data():
             return None
@@ -406,16 +416,15 @@ class SeasonForm:
         last = float(rows["week"].max())
         return float(len(rows)), float(self.target_week) - last
 
-    def target_share(self, player_id, name: str, team: str) -> float | None:
-        """Player targets over team targets, both cumulative through last week."""
+    def target_share(self, player_id, name: str) -> float | None:
+        """Player targets over team targets in the games he played, through last week."""
         if not self.has_data():
             return None
         rows = self._player_rows(self.box, player_id, name)
         if rows.empty:
             return None
-        team_rows = self.box[self.box["team"] == team]
         return safe_ratio(float(rows["targets"].fillna(0.0).sum()),
-                          float(team_rows["targets"].fillna(0.0).sum()))
+                          self._team_total_when_played(self.box, rows, "targets"))
 
     def usage_trends(self, player_id, name: str) -> tuple[float | None, float | None]:
         """This season's usage and target share against the same span last season.
@@ -431,8 +440,9 @@ class SeasonForm:
         if now.empty or before.empty:
             return None, None
 
+        # Per game played, as in Layer 3, so a missed game is not read as lost role.
         def usage(rows: pd.DataFrame) -> float:
-            return float(rows["targets"].fillna(0.0).sum() + rows["carries"].fillna(0.0).sum())
+            return float(rows["targets"].fillna(0.0).sum() + rows["carries"].fillna(0.0).sum()) / len(rows)
 
         def avg_share(rows: pd.DataFrame) -> float | None:
             shares = rows["target_share"].fillna(0.0)
@@ -459,16 +469,14 @@ class SeasonForm:
         def total(rows: pd.DataFrame, column: str) -> float:
             return float(rows[column].fillna(0.0).sum()) if not rows.empty else 0.0
 
+        # Carry share is of the team's carries in the games he played, both seasons.
         games = len(now)
         carries, yards = total(now, "carries"), total(now, "rushing_yards")
-        team_carries = total(self.box[self.box["team"] == team], "carries") if games else 0.0
+        team_carries = self._team_total_when_played(self.box, now, "carries")
 
         last_games = len(before)
         last_carries, last_yards = total(before, "carries"), total(before, "rushing_yards")
-        last_team_carries = None
-        if last_games:
-            last_team = before.sort_values("week")["team"].iloc[-1]
-            last_team_carries = total(self.prior_full_box[self.prior_full_box["team"] == last_team], "carries")
+        last_team_carries = self._team_total_when_played(self.prior_full_box, before, "carries")
 
         def shrink(current: float | None, prior: float | None, k: float) -> float | None:
             return blend(current if games else None, prior, games / (games + k) if games else 0.0)
@@ -536,13 +544,10 @@ class SeasonForm:
         def shrink(current: float | None, prior: float | None, k: float) -> float | None:
             return blend(current if games else None, prior, games / (games + k) if games else 0.0)
 
+        # Air yards share is of the team's air yards in the games he played.
         targets, last_targets = total(now, "targets"), total(before, "targets")
-        team_air = total(team_now, "receiving_air_yards")
-        last_team_air = None
-        if last_games:
-            last_team = before.sort_values("week")["team"].iloc[-1]
-            last_team_air = total(self.prior_full_box[self.prior_full_box["team"] == last_team],
-                                  "receiving_air_yards")
+        team_air = self._team_total_when_played(self.box, now, "receiving_air_yards")
+        last_team_air = self._team_total_when_played(self.prior_full_box, before, "receiving_air_yards")
 
         for column, stat in (("targets_per_game", "targets"), ("rec_yds_per_game", "receiving_yards")):
             value = shrink(safe_ratio(total(now, stat), games), safe_ratio(total(before, stat), last_games),
@@ -734,9 +739,14 @@ def prior_season_target_share(training: pd.DataFrame, player_id, name: str) -> f
     if rows.empty:
         return None
 
+    # Of the team's targets in the games he played, as Layer 3 builds it.
+    if "dnp_flag" in rows.columns:
+        rows = rows[rows["dnp_flag"] != 1]
+    if rows.empty:
+        return None
     player_targets = float(rows["targets"].fillna(0.0).sum())
-    player_team = rows.sort_values("week")["team"].iloc[-1]
-    team_targets = float(training[training["team"] == player_team]["targets"].fillna(0.0).sum())
+    weekly = training.groupby(["team", "week"])["targets"].sum()
+    team_targets = float(weekly.reindex(pd.MultiIndex.from_frame(rows[["team", "week"]])).fillna(0.0).sum())
     return safe_ratio(player_targets, team_targets)
 
 
@@ -1051,7 +1061,7 @@ def predict(name: str, requested_week: int | None = None, today: date | None = N
     if prior_share is None:
         prior_share = peer_target_share(training, position, depth_score)
         prior_basis = f"{CONTEXT_SEASON} {position} depth-tier median"
-    season_share = form.target_share(player.get("player_id"), player_name, team)
+    season_share = form.target_share(player.get("player_id"), player_name)
     target_share = blend(season_share, prior_share, weight)
     if season_share is None:
         share_basis = prior_basis
